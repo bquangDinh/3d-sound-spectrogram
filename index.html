@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + TS</title>
+  </head>
+  <body>
+    <div id="app">
+		<input type="file" id="read-audio-file" accept="audio/wav">
+		<div id="canvas-container">
+			<canvas id="spectrogram-canvas"></canvas>
+		</div>
+	</div>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
