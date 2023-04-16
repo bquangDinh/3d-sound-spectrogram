@@ -1,6 +1,8 @@
 import { util as FFTUtil } from "fft-js";
 import { FileUtils, NumberUtils } from "./utils";
 import { min, max } from "lodash";
+import { Shader } from "./webgl/shader";
+import { ShaderProgram } from "./webgl/shader-program";
 
 export class Graph {
 	private canvas!: HTMLCanvasElement
@@ -125,7 +127,7 @@ export class Graph {
 
 		const analyser = audioContext.createAnalyser()
 
-		analyser.fftSize = 512
+		analyser.fftSize = 1024
 
 		const bufferLength = analyser.frequencyBinCount
 
@@ -160,6 +162,174 @@ export class Graph {
 
 				x += barWidth + 1;
 			}
+		}
+
+		draw()
+	}
+
+	private async fromMic () {
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+		const audioContext = new AudioContext()
+
+		const mic = audioContext.createMediaStreamSource(stream)
+
+		const analyser = audioContext.createAnalyser()
+
+		analyser.fftSize = 512
+
+		mic.connect(analyser)
+
+		analyser.connect(audioContext.destination)
+
+		return analyser
+	}
+
+	public async testWebGL () {
+		const gl = this.canvas.getContext('webgl2')
+
+		if (!gl) {
+			throw new Error('Your browser does not support WebGL2')
+		}
+
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+		const vertexShaderSource = `#version 300 es
+
+			// an attribute is an input (in) to a vertex shader.
+			// It will receive data from a buffer
+			in vec2 a_position;
+
+			uniform vec2 u_resolution;
+
+			// all shaders have a main function
+			void main() {
+				// Convert the position from pixels to -1 -> +1 in clip space
+				vec2 zeroToOne = a_position / u_resolution;
+				vec2 zeroToTwo = zeroToOne * 2.0;
+				vec2 clipSpace = zeroToTwo - 1.0;
+
+				gl_Position = vec4(clipSpace, 0, 1);
+			}
+		`;
+
+		const fragmentShaderSource = `#version 300 es
+
+			// fragment shaders don't have a default precision so we need
+			// to pick one. highp is a good default. It means "high precision"
+			precision highp float;
+
+			// we need to declare an output for the fragment shader
+			out vec4 outColor;
+
+			void main() {
+				// Just set the output to a constant reddish-purple
+				outColor = vec4(1, 0, 0.5, 1);
+			}
+		`;
+
+		const vertexShader = new Shader(gl, vertexShaderSource, gl.VERTEX_SHADER)
+
+		const fragmentShader = new Shader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER)
+
+		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
+
+		const positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
+
+		// Create VAO
+		const vao = gl.createVertexArray()
+
+		// Use this VAO
+		gl.bindVertexArray(vao)
+
+		// Create position buffer that contains every point's locations in FFT
+		const lineBuffer = gl.createBuffer()
+
+		const indexBuffer = gl.createBuffer()
+
+		const analyser = await this.fromMic()
+
+		const bufferLength = analyser.frequencyBinCount
+
+		const dataArray = new Uint8Array(bufferLength)
+
+		let pointPositions: number[] = []
+
+		let indices: number[] = []
+
+		const draw = () => {
+			requestAnimationFrame(draw)
+
+			// Make sure the buffer is cleared
+			pointPositions = []
+
+			indices = []
+
+			// Fetch dataArray with data from the microphone
+			analyser.getByteFrequencyData(dataArray)
+
+			const DELTAX = gl.canvas.width / bufferLength
+
+			// Start drawing from the bottom-left corner of the canvas
+			let lastX = 0, lastY = 0
+
+			let y: number
+
+			pointPositions.push(lastX, lastY)
+
+			for (let i = 0; i < bufferLength; ++i) {
+				y = dataArray[i]
+
+				pointPositions.push(lastX + DELTAX, y)
+
+				indices.push(i, i + 1)
+
+				// Update lastX, lastY
+				lastX += DELTAX
+				lastY = y
+			}
+
+			// Tell WebGL to use the array buffer
+			gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
+
+			// Fetch the array buffer
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pointPositions), gl.DYNAMIC_DRAW)
+
+			// Tell WebGL to use the indices array buffer
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
+
+			// Fetch the index buffer
+			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.DYNAMIC_DRAW)
+
+			// Use line buffer
+			gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
+
+			gl.enableVertexAttribArray(positionAttributeLocation)
+
+			// Instruct WebGL how to read the buffer
+			const size = 2 // x, y components
+			const type = gl.FLOAT
+			const normalize = false
+			const stride = 0
+			const offset = 0
+
+			gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset)
+
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
+
+			// Make canvas transparent
+			gl.clearColor(0, 0, 0, 0)
+			gl.clear(gl.COLOR_BUFFER_BIT)
+
+			shaderProgram.use()
+
+			gl.bindVertexArray(vao)
+
+			shaderProgram.setVec2('u_resolution', [gl.canvas.width, gl.canvas.height])
+
+			gl.drawElements(gl.LINES, indices.length, gl.UNSIGNED_SHORT, 0)
+
+			console.log(indices)
 		}
 
 		draw()
