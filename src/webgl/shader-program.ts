@@ -1,4 +1,5 @@
 import { Shader } from "./shader"
+import { mat4 } from "gl-matrix"
 
 export class ShaderProgram {
 	private _shaderProgram: WebGLProgram
@@ -61,6 +62,12 @@ export class ShaderProgram {
 		const location = this.gl.getUniformLocation(this.program, name)
 
 		this.gl.uniform2f(location, value[0], value[1])
+	}
+
+	public setMatrix4(name: string, matrix: mat4) {
+		const location = this.gl.getUniformLocation(this.program, name)
+
+		this.gl.uniformMatrix4fv(location, false, matrix)
 	}
 
 	public deleteProgram() {

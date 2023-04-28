@@ -23,4 +23,4 @@ import { Graph } from './graph'
 
 const graph = new Graph('spectrogram-canvas', 'canvas-container')
 
-graph.testWebGL()
+graph.testMarchingCubes()

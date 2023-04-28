@@ -3,6 +3,7 @@ import { FileUtils, NumberUtils } from "./utils";
 import { min, max } from "lodash";
 import { Shader } from "./webgl/shader";
 import { ShaderProgram } from "./webgl/shader-program";
+import { MarchingCube } from "./marching-cube";
 
 export class Graph {
 	private canvas!: HTMLCanvasElement
@@ -329,9 +330,97 @@ export class Graph {
 
 			gl.drawElements(gl.LINES, indices.length, gl.UNSIGNED_SHORT, 0)
 
-			console.log(indices)
 		}
 
 		draw()
+	}
+
+	public async testMarchingCubes () {
+		this.canvas.addEventListener('click', async () => {
+			await this.canvas.requestPointerLock()
+		})
+
+		const gl = this.canvas.getContext('webgl2')
+
+		if (!gl) {
+			throw new Error('Your browser does not support WebGL2')
+		}
+
+		const analyser = await this.fromMic()
+
+		const bufferLength = analyser.frequencyBinCount
+
+		const dataArray = new Uint8Array(bufferLength)
+
+		let previousTime = 0
+		let animation = -1
+
+		const mc = new MarchingCube(gl)
+
+		mc.init()
+
+		const draw = (currentTime: number) => {
+			// Fetch dataArray with data from the microphone
+			analyser.getByteFrequencyData(dataArray)
+
+			// Convert time to seconds
+			currentTime *= 0.001
+
+			// Compute how much time has passed since the last frame
+			const deltaTime = currentTime - previousTime
+
+			previousTime = currentTime
+
+			mc.ffts = dataArray
+
+			mc.processKeyInput(deltaTime)
+
+			mc.update(deltaTime)
+
+			animation = requestAnimationFrame(draw)
+		}
+
+		animation = requestAnimationFrame(draw)
+
+		const KeyBoardUpCb = (ev: KeyboardEvent) => {
+			if (ev.code === 'Escape') {
+				if (animation !== -1) {
+					// Stop
+					cancelAnimationFrame(animation)
+
+					animation = -1
+				}
+
+				document.removeEventListener('keyup', KeyBoardUpCb)
+			} else {
+				mc.keysMap[ev.code] = false
+			}
+		}
+
+		const KeyBoardDownCb = (ev: KeyboardEvent) => {
+			if (ev.code === 'Escape') {
+				if (animation !== -1) {
+					// Stop
+					cancelAnimationFrame(animation)
+
+					animation = -1
+				}
+
+				document.removeEventListener('keydown', KeyBoardDownCb)
+			} else {
+				mc.keysMap[ev.code] = true
+			}
+		}
+
+		const MouseMoveCb = (ev: MouseEvent) => {
+			mc.processMouseInput(ev.movementX, ev.movementY)
+		}
+
+		// Add Event to listen to keyboard change
+		document.addEventListener('keydown', KeyBoardDownCb)
+
+		document.addEventListener('keyup', KeyBoardUpCb)
+
+		document.addEventListener('mousemove', MouseMoveCb)
 	}
 }

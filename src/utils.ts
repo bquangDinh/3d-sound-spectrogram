@@ -1,4 +1,5 @@
 import { fft, Phasors } from "fft-js"
+import { vec3 } from "gl-matrix"
 
 export interface IAudioBufferOptions {
 	channel?: number
@@ -13,6 +14,12 @@ export interface INormalize {
 	value: number,
 	fromRange: Range,
 	toRange: Range
+}
+
+export interface IVector3 {
+	x: number,
+	y: number,
+	z: number,
 }
 
 export const NumberUtils = {
@@ -36,6 +43,9 @@ export const NumberUtils = {
 		const { value, fromRange, toRange } = payload
 
 		return ((toRange.max - toRange.min) * (value - fromRange.min) / (fromRange.max - fromRange.min)) + toRange.min
+	},
+	getIndexFromXYZ: (x: number, y: number, z: number, dims: vec3) => {
+		return z + dims[2] * (y + dims[1] * x);
 	}
 }
 
