@@ -49,13 +49,13 @@ export class MarchingCube {
 		4, 5, 0, 0, 5, 1
 	]
 
-	private readonly DIMENSIONS: vec3 = [512, 12, 12]
+	private readonly DIMENSIONS: vec3 = [512, 12, 50]
 
 	private readonly VOXEL_SIZE = 0.5
 
 	private vertices: number[] = []
 
-	private readonly WAIT = 0.5
+	private readonly WAIT = 1
 
 	private time = 0
 
@@ -152,14 +152,18 @@ export class MarchingCube {
 		this.time += dt
 
 		if (this.time < this.WAIT) {
-			this.z_Index = ++this.z_Index % 12
+			this.z_Index = ++this.z_Index % 50
 			this.time = 0
 		}
 
 		this.testDrawingFFt()
 
+		this.shaderProgram.use()
+
 		this.shaderProgram.setMatrix4('projection', this.perspectiveMatrix)
 		this.shaderProgram.setMatrix4('view', this.camera.getViewMatrix())
+
+		this.gl.useProgram(null)
 	}
 
 	private testDrawingFFt () {
@@ -169,28 +173,38 @@ export class MarchingCube {
 			throw new Error('No WebGL2Context found')
 		}
 
+		if (this.ffts.length === 0) return
+
 		const MAX_HEIGHT = this.VOXEL_SIZE * this.DIMENSIONS[1]
 
 		const MAX_HEIGHT_FFT = max(this.ffts) ?? 0
 
-		let height: number, value: number
+		if (MAX_HEIGHT_FFT === 0) return
+
+		let height: number, value: number, index: number
 
 		for (let i = 3 + 24576 * this.z_Index; i < 24576 * (this.z_Index + 1); i += 4) {
-			height = NumberUtils.normalize({
-				value: this.ffts[this.vertices[i - 3] / this.VOXEL_SIZE],
-				fromRange: {
-					min: 0,
-					max: MAX_HEIGHT_FFT
-				},
-				toRange: {
-					min: 0,
-					max: MAX_HEIGHT
-				}
-			})
+			index = this.vertices[i - 3] / this.VOXEL_SIZE
 
-			value = height - this.vertices[i - 2] * this.VOXEL_SIZE
+			if (index >= this.ffts.length) {
+				height = 0
+			} else {
+				height = NumberUtils.normalize({
+					value: this.ffts[this.vertices[i - 3] / this.VOXEL_SIZE],
+					fromRange: {
+						min: 0,
+						max: MAX_HEIGHT_FFT
+					},
+					toRange: {
+						min: 0,
+						max: MAX_HEIGHT
+					}
+				})
+			}
 
-			if (value < 0) {
+			value = height - this.vertices[i - 2]
+
+			if (value < 0 || height === 0) {
 				this.vertices[i] = 0
 			} else {
 				this.vertices[i] = value / height

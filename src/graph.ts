@@ -177,7 +177,7 @@ export class Graph {
 
 		const analyser = audioContext.createAnalyser()
 
-		analyser.fftSize = 512
+		analyser.fftSize = 1024
 
 		mic.connect(analyser)
 
