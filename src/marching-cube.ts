@@ -173,17 +173,26 @@ export class MarchingCube {
 			throw new Error('No WebGL2Context found')
 		}
 
+		// If FFT data is empty, then nothing to do here
 		if (this.ffts.length === 0) return
 
 		const MAX_HEIGHT = this.VOXEL_SIZE * this.DIMENSIONS[1]
 
 		const MAX_HEIGHT_FFT = max(this.ffts) ?? 0
 
+		// There are some cases when FFT data is all zero, resulting in MAX_HEIGHT_FFT is also zero
+		// To prevent dividing to zero, just terminate here
 		if (MAX_HEIGHT_FFT === 0) return
 
 		let height: number, value: number, index: number
 
-		for (let i = 3 + 24576 * this.z_Index; i < 24576 * (this.z_Index + 1); i += 4) {
+		// each data point contains 4 points which are x, y, z, d
+		const numberDataInXAxis = this.DIMENSIONS[0] * this.DIMENSIONS[1] * 4
+
+		// Fetch FFT data into the vertices array
+		// Since x, y, z component of a point are not changed, only the d component is changed by the FFT data
+		// so I make some jumpy move here to access the d part
+		for (let i = 3 + numberDataInXAxis * this.z_Index; i < numberDataInXAxis * (this.z_Index + 1); i += 4) {
 			index = this.vertices[i - 3] / this.VOXEL_SIZE
 
 			if (index >= this.ffts.length) {
@@ -211,12 +220,17 @@ export class MarchingCube {
 			}
 		}
 
+		// Use VAO
 		gl.bindVertexArray(this.VAO)
 
+		// Tell WebGL to use verticesBuffer
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
+		// Fetch data into buffer
 		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW)
 
+		// Fetch data into position attribute from the buffer
+		// Enable the attribute in the shader program
 		gl.enableVertexAttribArray(this.positionAttributeLocation)
 
 		// Instruct WebGL how to read the buffer
@@ -226,14 +240,17 @@ export class MarchingCube {
 		let stride = 16
 		let offset = 0
 
+		// Fetch instruction to Shader Program
 		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
 
+		// Fetch data into density attribute from the buffer
 		gl.enableVertexAttribArray(this.densityAttributeLocation)
 
 		size = 1
 		stride = 16
 		offset = 12
 
+		// Fetch instruction to Shader Program
 		gl.vertexAttribPointer(this.densityAttributeLocation, size, type, normalize, stride, offset)
 
 		// Make canvas transparent
