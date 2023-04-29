@@ -1,7 +1,7 @@
 import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 import { Camera } from "./camera";
 import { Shader } from "./webgl/shader";
-import { ShaderProgram } from "./webgl/shader-program";
+import { AllowUniformTypes, ShaderProgram } from "./webgl/shader-program";
 import { NumberUtils } from "./utils";
 import { max } from "lodash";
 import { EdgeVertexIndices, TriangleTable } from "./lookup-table";
@@ -15,7 +15,8 @@ export class MarchingCube {
 
 	private ffts: Uint8Array[] = []
 
-	private perspectiveMatrix: mat4 = mat4.create()
+	/* Shader Program Properties */
+	private uniformSetters: Record<string, Function> = {}
 
 	// Shader Attribute Locations
 	private positionAttributeLocation: number = -1
@@ -64,11 +65,7 @@ export class MarchingCube {
 
 	constructor(
 		private gl: WebGL2RenderingContext
-	) {
-		// Calculating aspect by canvas.width / canvas.height is not recommended since CSS may influenced the size
-		// Should use canvas.clientWidth and canvas.clientHeight since those are constants and not influeced by CSS
-		mat4.perspective(this.perspectiveMatrix, glMatrix.toRadian(45.0), (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight, 0.1, 200)
-	}
+	) {}
 
 	public init () {
 		const gl = this.gl
@@ -94,6 +91,19 @@ export class MarchingCube {
 		// Since there is only one program so I don't need to switch
 		shaderProgram.use()
 
+		// Get Uniform Setters
+		this.uniformSetters = shaderProgram.createUniformSetters()
+
+		// Save some matrixs at initialization
+
+		// Calculating aspect by canvas.width / canvas.height is not recommended since CSS may influenced the size
+		// Should use canvas.clientWidth and canvas.clientHeight since those are constants and not influeced by CSS
+		shaderProgram.setUniforms(this.uniformSetters, {
+			'projection': mat4.perspective(mat4.create(), glMatrix.toRadian(45.0), (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight, 0.1, 200),
+			'lightPos': [0.5, 0.7, 1],
+			'maxHeight': this.DIMENSIONS[1] * this.VOXEL_SIZE,
+		})
+
 		// Save attribute locations
 		this.positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
 
@@ -105,14 +115,6 @@ export class MarchingCube {
 		this.verticesBuffer = gl.createBuffer()
 
 		this.indicesBuffer = gl.createBuffer()
-
-		// Set light position
-		shaderProgram.setVec3('lightPos', [0.5, 0.7, 1])
-
-		// Set maxHeight attribute
-		// maxHeight is the maximum allowed y coordinate of vertex
-		// I use maxHeight to calculate color that based on height
-		shaderProgram.setFloat('maxHeight', this.DIMENSIONS[1] * this.VOXEL_SIZE);
 
 		// Initialize vertices data array
 		// Each data is a vec4 contains x, y, z coordinate of the point and density value as 0
@@ -142,9 +144,10 @@ export class MarchingCube {
 		// Magic here
 		this.drawFFT()
 
-		// Update matrixes
-		this.shaderProgram.setMatrix4('projection', this.perspectiveMatrix)
-		this.shaderProgram.setMatrix4('view', this.camera.getViewMatrix())
+		// Update view matrix
+		this.shaderProgram.setUniforms(this.uniformSetters, {
+			'view': this.camera.getViewMatrix()
+		})
 	}
 
 	// Detech changes in canvas size and change canvas size accordingly
