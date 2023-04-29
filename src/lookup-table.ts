@@ -1,3 +1,55 @@
+//
+// Lookup Tables for Marching Cubes
+//
+// These tables differ from the original paper (Marching Cubes: A High Resolution 3D Surface Construction Algorithm)
+//
+// The co-ordinate system has the more convenient properties:
+//
+//    i = cube index [0, 7]
+//    x = (i & 1) >> 0
+//    y = (i & 2) >> 1
+//    z = (i & 4) >> 2
+//
+// Axes are:
+//
+//      y
+//      |     z
+//      |   /
+//      | /
+//      +----- x
+//
+// Vertex and edge layout:
+//
+//            6             7
+//            +-------------+               +-----6-------+
+//          / |           / |             / |            /|
+//        /   |         /   |          11   7         10   5
+//    2 +-----+-------+  3  |         +-----+2------+     |
+//      |   4 +-------+-----+ 5       |     +-----4-+-----+
+//      |   /         |   /           3   8         1   9
+//      | /           | /             | /           | /
+//    0 +-------------+ 1             +------0------+
+//
+// Triangulation cases are generated prioritising rotations over inversions, which can introduce non-manifold geometry.
+//
+
+
+// Pair of vertex indices for each edge on the cube
+export const EdgeVertexIndices = [
+	[0, 1],
+	[1, 3],
+	[3, 2],
+	[2, 0],
+	[4, 5],
+	[5, 7],
+	[7, 6],
+	[6, 4],
+	[0, 4],
+	[1, 5],
+	[3, 7],
+	[2, 6],
+];
+
 // For each MC case, a mask of edge indices that need to be split
 export const EdgeMasks = [
 	0x0, 0x109, 0x203, 0x30a, 0x80c, 0x905, 0xa0f, 0xb06,

@@ -1,9 +1,10 @@
-import { glMatrix, mat4, vec3 } from "gl-matrix";
+import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 import { Camera } from "./camera";
 import { Shader } from "./webgl/shader";
 import { ShaderProgram } from "./webgl/shader-program";
 import { NumberUtils } from "./utils";
 import { max } from "lodash";
+import { EdgeVertexIndices, TriangleTable } from "./lookup-table";
 
 export class MarchingCube {
 	private shaderProgram!: ShaderProgram
@@ -19,7 +20,7 @@ export class MarchingCube {
 	// Shader Attribute Locations
 	private positionAttributeLocation: number = -1
 
-	private densityAttributeLocation: number = -1
+	private normalAttributeLocation: number = -1
 
 	// Buffer
 	private verticesBuffer: WebGLBuffer | null = null
@@ -49,17 +50,22 @@ export class MarchingCube {
 		4, 5, 0, 0, 5, 1
 	]
 
-	private readonly DIMENSIONS: vec3 = [512, 12, 50]
+	private readonly DIMENSIONS: vec3 = [512, 24, 50]
 
-	private readonly VOXEL_SIZE = 0.5
+	private readonly VOXEL_SIZE = 1
 
-	private vertices: number[] = []
+	private readonly ISO_LEVEL = 0
+
+	private vertices: vec4[] = []
+
+	private mVertices: number[] = []
 
 	private readonly WAIT = 1
 
 	private time = 0
 
 	private z_Index = 0
+
 	constructor(
 		private gl: WebGL2RenderingContext
 	) {
@@ -83,19 +89,19 @@ export class MarchingCube {
 			// It will receive data from a buffer
 			in vec3 a_position;
 
-			in float a_density;
+			in vec3 a_normal;
 
 			uniform mat4 model;
 			uniform mat4 view;
 			uniform mat4 projection;
 
-			out float out_density;
+			out vec3 v_normal;
 
 			// all shaders have a main function
 			void main() {
 				gl_Position = projection * view * vec4(a_position, 1.0f);
-				gl_PointSize = 5.0f;
-				out_density = a_density;
+
+				v_normal = a_normal;
 			}
 		`;
 
@@ -106,14 +112,20 @@ export class MarchingCube {
 			// to pick one. highp is a good default. It means "high precision"
 			precision highp float;
 
-			in float out_density;
-
-			// we need to declare an output for the fragment shader
 			out vec4 outColor;
 
+			uniform vec3 u_reverseLightDirection;
+
+			in vec3 v_normal;
+
 			void main() {
-				// Just set the output to a constant reddish-purple
-				outColor = vec4(1, 0, 0, out_density);
+				vec3 normal = normalize(v_normal);
+
+				float light = dot(normal, u_reverseLightDirection);
+
+				outColor = vec4(1, 0, 0, 1);
+
+				outColor.rgb *= light;
 			}
 		`;
 
@@ -126,9 +138,12 @@ export class MarchingCube {
 
 		this.shaderProgram = shaderProgram
 
+		// Set this current program as default use
+		shaderProgram.use()
+
 		this.positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
 
-		this.densityAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_density')
+		this.normalAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_normal')
 
 		this.VAO = gl.createVertexArray()
 
@@ -136,11 +151,13 @@ export class MarchingCube {
 
 		this.indicesBuffer = gl.createBuffer()
 
+		shaderProgram.setVec3('u_reverseLightDirection', [0.5, 0.7, 1])
+
 		for (let z = 0; z < this.DIMENSIONS[2]; ++z) {
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
 					this.vertices.push(
-						x * this.VOXEL_SIZE, y * this.VOXEL_SIZE, z * this.VOXEL_SIZE, 0
+						vec4.fromValues(x * this.VOXEL_SIZE, y * this.VOXEL_SIZE, z * this.VOXEL_SIZE, 0)
 					)
 				}
 			}
@@ -149,21 +166,24 @@ export class MarchingCube {
 
 	// Will be called every frame
 	public update (dt: number) {
+		 // Turn on culling. By default backfacing triangles
+		// will be culled.
+		this.gl.enable(this.gl.CULL_FACE);
+
+		// Enable the depth buffer
+		this.gl.enable(this.gl.DEPTH_TEST);
+
 		this.time += dt
 
 		if (this.time < this.WAIT) {
-			this.z_Index = ++this.z_Index % 50
+			this.z_Index = ++this.z_Index % this.DIMENSIONS[2]
 			this.time = 0
 		}
 
 		this.testDrawingFFt()
 
-		this.shaderProgram.use()
-
 		this.shaderProgram.setMatrix4('projection', this.perspectiveMatrix)
 		this.shaderProgram.setMatrix4('view', this.camera.getViewMatrix())
-
-		this.gl.useProgram(null)
 	}
 
 	private testDrawingFFt () {
@@ -186,39 +206,44 @@ export class MarchingCube {
 
 		let height: number, value: number, index: number
 
-		// each data point contains 4 points which are x, y, z, d
-		const numberDataInXAxis = this.DIMENSIONS[0] * this.DIMENSIONS[1] * 4
-
 		// Fetch FFT data into the vertices array
 		// Since x, y, z component of a point are not changed, only the d component is changed by the FFT data
 		// so I make some jumpy move here to access the d part
-		for (let i = 3 + numberDataInXAxis * this.z_Index; i < numberDataInXAxis * (this.z_Index + 1); i += 4) {
-			index = this.vertices[i - 3] / this.VOXEL_SIZE
+		for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
+			for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
+				index = NumberUtils.getIndexFromXYZ(x, y, this.z_Index, this.DIMENSIONS)
 
-			if (index >= this.ffts.length) {
-				height = 0
-			} else {
-				height = NumberUtils.normalize({
-					value: this.ffts[this.vertices[i - 3] / this.VOXEL_SIZE],
-					fromRange: {
-						min: 0,
-						max: MAX_HEIGHT_FFT
-					},
-					toRange: {
-						min: 0,
-						max: MAX_HEIGHT
-					}
-				})
-			}
+				if (x >= this.ffts.length) {
+					height = 0
+				} else {
+					height = NumberUtils.normalize({
+						value: this.ffts[x],
+						fromRange: {
+							min: 0,
+							max: MAX_HEIGHT_FFT
+						},
+						toRange: {
+							min: 0,
+							max: MAX_HEIGHT
+						}
+					})
+				}
 
-			value = height - this.vertices[i - 2]
+				value = height - this.vertices[index][1]
 
-			if (value < 0 || height === 0) {
-				this.vertices[i] = 0
-			} else {
-				this.vertices[i] = value / height
+				if (value < 0 || height === 0) {
+					this.vertices[index][3] = 0
+				} else {
+					this.vertices[index][3] = value / height
+				}
 			}
 		}
+
+		// Clear old data
+		this.mVertices = []
+
+		// Triangulate based on vertices FFT data
+		this.triangulate()
 
 		// Use VAO
 		gl.bindVertexArray(this.VAO)
@@ -227,7 +252,7 @@ export class MarchingCube {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
 		// Fetch data into buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW)
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.mVertices), gl.DYNAMIC_DRAW)
 
 		// Fetch data into position attribute from the buffer
 		// Enable the attribute in the shader program
@@ -235,69 +260,188 @@ export class MarchingCube {
 
 		// Instruct WebGL how to read the buffer
 		let size = 3 // x, y, z components
-		const type = gl.FLOAT
-		const normalize = false
-		let stride = 16
+		let type = gl.FLOAT
+		let normalize = false
+		let stride = 24
 		let offset = 0
 
 		// Fetch instruction to Shader Program
 		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
 
-		// Fetch data into density attribute from the buffer
-		gl.enableVertexAttribArray(this.densityAttributeLocation)
+		gl.enableVertexAttribArray(this.normalAttributeLocation)
 
-		size = 1
-		stride = 16
 		offset = 12
 
-		// Fetch instruction to Shader Program
-		gl.vertexAttribPointer(this.densityAttributeLocation, size, type, normalize, stride, offset)
-
-		// Make canvas transparent
-		gl.clearColor(0, 0, 0, 0)
-		gl.clear(gl.COLOR_BUFFER_BIT)
-
-		this.shaderProgram.use()
-
-		gl.bindVertexArray(this.VAO)
-
-		gl.drawArrays(gl.POINTS, 0, this.vertices.length / 4)
-	}
-
-	private testDrawVoxels () {
-		const gl = this.gl
-
-		if (!gl) {
-			throw new Error('No WebGL2Context found')
-		}
-
-		gl.bindVertexArray(this.VAO)
+		gl.vertexAttribPointer(this.normalAttributeLocation, size, type, normalize, stride, offset)
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW)
-
-		gl.enableVertexAttribArray(this.positionAttributeLocation)
-
-		// Instruct WebGL how to read the buffer
-		const size = 3 // x, y, z components
-		const type = gl.FLOAT
-		const normalize = false
-		const stride = 0
-		const offset = 0
-
-		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
+		gl.bindVertexArray(this.VAO)
 
 		// Make canvas transparent
 		gl.clearColor(0, 0, 0, 0)
 		gl.clear(gl.COLOR_BUFFER_BIT)
 
-		this.shaderProgram.use()
-
-		gl.bindVertexArray(this.VAO)
-
-		gl.drawArrays(gl.POINTS, 0, this.vertices.length / 3)
+		gl.drawArrays(gl.TRIANGLES, 0, this.mVertices.length / 6)
 	}
+
+	private triangulate () {
+		let cube: vec4[] = []
+
+		let index: number
+
+		for (let z = 0; z < this.DIMENSIONS[2] - 1; ++z) {
+			for (let y = 0; y < this.DIMENSIONS[1] - 1; ++y) {
+				for (let x = 0; x < this.DIMENSIONS[0] - 1; ++x) {
+					// Get 8 points of a voxel
+					/**
+					 * i = 0  (binary: 000)
+						i = 1  (binary: 001)
+						i = 2  (binary: 010)
+						i = 3  (binary: 011)
+						i = 4  (binary: 100)
+						i = 5  (binary: 101)
+						i = 6  (binary: 110)
+						i = 7  (binary: 111)
+					 */
+					for (let i = 0; i < 8; ++i) {
+						index = NumberUtils.getIndexFromXYZ(
+							x + (i & 1), // access the least significant bit
+							y + ((i >> 1) & 1), // shift right and access the least significant bit
+							z + ((i >> 2) & 1), // shift right two times and access the least significant bit
+							this.DIMENSIONS
+						)
+
+						// if (index > 73700) {
+						// 	console.log(this.vertices[index][2])
+						// }
+
+						cube.push(this.vertices[index])
+					}
+
+					this.triangulateCube([...cube])
+
+					cube = []
+				}
+			}
+		}
+	}
+
+	// Construct the mesh from cube configuration
+	// Implementation is inspired from https://www.youtube.com/watch?v=M3iI2l0ltbE&t=270s
+	private triangulateCube(cube: vec4[]) {
+		let cubeIndex = 0
+
+		for (let i = 0; i < 8; ++i) {
+			// console.log(cube[i][2]) // z !== 0
+
+			if (cube[i][3] > this.ISO_LEVEL) {
+				cubeIndex |= 1 << i
+			}
+		}
+
+		// Look up the triangulation for the current cubeIndex
+		// Each entry is the index of the edge
+		const triangulation = TriangleTable[cubeIndex]
+
+		// The last number in triangulation is -1 indicates termination
+		// I don't need it here, so I skip the last number
+		let edgeIndex: number
+		let i1: number, i2: number
+
+		let vertexPos: vec3[] = []
+
+		for (let i = 0; i < triangulation.length - 1; ++i) {
+			edgeIndex = triangulation[i]
+
+			// Lookup the indices of the corner points making up the current edge
+			i1 = EdgeVertexIndices[edgeIndex][0]
+			i2 = EdgeVertexIndices[edgeIndex][1]
+
+			// Interpolate
+			vertexPos.push(this.vertexInterp(cube[i1], cube[i2]))
+		}
+
+		for (let i = 0; i < vertexPos.length; i += 3) {
+			this.addTriangle(vertexPos[i], vertexPos[i + 1], vertexPos[i + 2])
+		}
+	}
+
+	// Interpolate between two points based on iso level
+	// Point is a vec4 that contains x, y, x, d
+	// d is the density value of the point
+	// x, y, z is the coordinate of the point in world space
+	private vertexInterp(p1: vec4, p2: vec4, iso?: number) {
+		const isoLevel = iso ?? this.ISO_LEVEL
+
+		if (Math.abs(isoLevel - p1[3]) < Number.EPSILON) return vec3.fromValues(p1[0], p1[1], p1[2])
+		if (Math.abs(isoLevel - p2[3]) < Number.EPSILON) return vec3.fromValues(p2[0], p2[1], p2[2])
+		if (Math.abs(p2[3] - p1[3]) < Number.EPSILON || (p2[3] === 0 && p1[3] === 0)) return vec3.fromValues(p1[0], p1[1], p1[2])
+
+		const mu = (isoLevel - p1[3]) / (p2[3] - p1[3])
+
+		const p: vec3 = vec3.fromValues(
+			p1[0] + mu * (p2[0] - p1[0]),
+			p1[1] + mu * (p2[1] - p1[1]),
+			p1[2] + mu * (p2[2] - p1[2])
+		)
+
+		return p
+
+		// const p = vec4.add(vec4.create(), p1, p2)
+
+		// vec4.scale(p, p, 1 / 2)
+
+		// return vec3.fromValues(p[0], p[1], p[2])
+	}
+
+	private addTriangle(p1: vec3, p2: vec3, p3: vec3) {
+		const p12 = vec3.sub(vec3.create(), p1, p2)
+		const p13 = vec3.sub(vec3.create(), p1, p3)
+
+		const normal = vec3.cross(vec3.create(), p12, p13)
+
+		this.mVertices.push(
+			p1[0], p1[1], p1[2], normal[0], normal[1], normal[2],
+			p2[0], p2[1], p2[2], normal[0], normal[1], normal[2],
+			p3[0], p3[1], p3[2], normal[0], normal[1], normal[2],
+		)
+	}
+
+	// private testDrawVoxels () {
+	// 	const gl = this.gl
+
+	// 	if (!gl) {
+	// 		throw new Error('No WebGL2Context found')
+	// 	}
+
+	// 	gl.bindVertexArray(this.VAO)
+
+	// 	gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
+
+	// 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.STATIC_DRAW)
+
+	// 	gl.enableVertexAttribArray(this.positionAttributeLocation)
+
+	// 	// Instruct WebGL how to read the buffer
+	// 	const size = 3 // x, y, z components
+	// 	const type = gl.FLOAT
+	// 	const normalize = false
+	// 	const stride = 0
+	// 	const offset = 0
+
+	// 	gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
+
+	// 	// Make canvas transparent
+	// 	gl.clearColor(0, 0, 0, 0)
+	// 	gl.clear(gl.COLOR_BUFFER_BIT)
+
+	// 	this.shaderProgram.use()
+
+	// 	gl.bindVertexArray(this.VAO)
+
+	// 	gl.drawArrays(gl.POINTS, 0, this.vertices.length / 3)
+	// }
 
 	private testDrawCube () {
 		const gl = this.gl

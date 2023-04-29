@@ -45,7 +45,7 @@ export const NumberUtils = {
 		return ((toRange.max - toRange.min) * (value - fromRange.min) / (fromRange.max - fromRange.min)) + toRange.min
 	},
 	getIndexFromXYZ: (x: number, y: number, z: number, dims: vec3) => {
-		return z + dims[2] * (y + dims[1] * x);
+		return x + dims[0] * (y + dims[1] * z)
 	}
 }
 
