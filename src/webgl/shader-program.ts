@@ -70,6 +70,12 @@ export class ShaderProgram {
 		this.gl.uniform3f(location, value[0], value[1], value[2])
 	}
 
+	public setFloat(name: string, value: number) {
+		const location = this.gl.getUniformLocation(this.program, name);
+
+		this.gl.uniform1f(location, value);
+	}
+
 	public setMatrix4(name: string, matrix: mat4) {
 		const location = this.gl.getUniformLocation(this.program, name)
 

@@ -96,12 +96,15 @@ export class MarchingCube {
 			uniform mat4 projection;
 
 			out vec3 v_normal;
+			out vec3 v_pos;
 
 			// all shaders have a main function
 			void main() {
 				gl_Position = projection * view * vec4(a_position, 1.0f);
 
+				// pass to fragment shader
 				v_normal = a_normal;
+				v_pos = a_position;
 			}
 		`;
 
@@ -114,18 +117,36 @@ export class MarchingCube {
 
 			out vec4 outColor;
 
-			uniform vec3 u_reverseLightDirection;
+			uniform vec3 lightPos;
+			uniform float maxHeight;
 
 			in vec3 v_normal;
+			in vec3 v_pos;
 
 			void main() {
+				float percentage = v_pos[1] / maxHeight;
+
+				vec3 lightColor = vec3(1, 1, 1);
+				vec3 objectColor = vec3(1, 0, percentage);
+				float ambientStrength = 0.1f;
+
 				vec3 normal = normalize(v_normal);
+				vec3 lightDirection = normalize(lightPos - v_pos);
 
-				float light = dot(normal, u_reverseLightDirection);
+				// calculate the diffuse impact on the fragment
+				// if the lightDirection is perpendicular to the surface or parallel to the normal
+				// then diffusion will have the greatest impact
+				// if the lightDirection is paralell to the surface or perpendicular to the normal
+				// then diffusion is zero (no impact on surface)
+				float diff = max(dot(normal, lightDirection), 0.0f);
 
-				outColor = vec4(1, 0, 0, 1);
+				vec3 diffuse = diff * lightColor;
 
-				outColor.rgb *= light;
+				vec3 ambient = ambientStrength * lightColor;
+
+				vec3 result = (ambient + diffuse) * objectColor;
+
+				outColor = vec4(result, 1);
 			}
 		`;
 
@@ -151,7 +172,9 @@ export class MarchingCube {
 
 		this.indicesBuffer = gl.createBuffer()
 
-		shaderProgram.setVec3('u_reverseLightDirection', [0.5, 0.7, 1])
+		shaderProgram.setVec3('lightPos', [0.5, 0.7, 1])
+
+		shaderProgram.setFloat('maxHeight', this.DIMENSIONS[1] * this.VOXEL_SIZE);
 
 		for (let z = 0; z < this.DIMENSIONS[2]; ++z) {
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
