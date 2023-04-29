@@ -355,6 +355,10 @@ export class Graph {
 		let previousTime = 0
 		let animation = -1
 
+		let time = 0
+
+		const WAIT = 1
+
 		const mc = new MarchingCube(gl)
 
 		mc.init()
@@ -371,7 +375,7 @@ export class Graph {
 
 			previousTime = currentTime
 
-			mc.ffts = dataArray
+			mc.addFFT(dataArray)
 
 			mc.processKeyInput(deltaTime)
 

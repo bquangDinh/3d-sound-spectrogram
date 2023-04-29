@@ -13,7 +13,103 @@
 			<canvas id="spectrogram-canvas"></canvas>
 		</div>
 	</div>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.js"></script>
+	<script type="x-shader/x-vertex" id="vertex-shader">
+		#version 300 es
+
+		// an attribute is an input (in) to a vertex shader.
+		// It will receive data from a buffer
+		in vec3 a_position;
+		in vec3 a_normal;
+
+		uniform mat4 model;
+		uniform mat4 view;
+		uniform mat4 projection;
+
+		out vec3 v_normal;
+		out vec3 v_pos;
+
+		// all shaders have a main function
+		void main() {
+			gl_Position = projection * view * vec4(a_position, 1.0f);
+
+			// pass to fragment shader
+			v_normal = a_normal;
+			v_pos = a_position;
+		}
+	</script>
+	<script type="x-shader/x-fragment" id="fragment-shader">
+		#version 300 es
+
+		// fragment shaders don't have a default precision so we need
+		// to pick one. highp is a good default. It means "high precision"
+		precision highp float;
+		out vec4 outColor;
+
+		uniform vec3 lightPos;
+		uniform float maxHeight;
+
+		in vec3 v_normal;
+		in vec3 v_pos;
+
+		vec3 interpolate(float height) {
+			float percentage = height / maxHeight;
+
+			vec3 objectColor;
+
+			if (percentage <= 0.4f) {
+				// interpolate between red and purple
+				objectColor = mix(vec3(1, 0, 0), vec3(1, 0, 1), percentage);
+			} else if (percentage <= 0.6f) {
+				// interpolate between purple and blue
+				objectColor = mix(vec3(1, 0, 0), vec3(0, 0, 1), percentage);
+			} else if (percentage <= 0.8f) {
+				// interpolate between blue and cyan
+				objectColor = mix(vec3(1, 0, 0), vec3(0, 1, 1), percentage);
+			} else {
+				// interpolate between cyan and green
+				objectColor = mix(vec3(1, 0, 0), vec3(0, 1, 0), percentage);
+			}
+
+			return objectColor;
+		}
+
+		void main() {
+			vec3 objectColor = interpolate(v_pos[1]);
+
+			vec3 neighborColor1 = interpolate(v_pos[1] - 1.0f);
+
+			vec3 neighborColor2 = interpolate(v_pos[1] - 2.0f);
+
+			vec3 neighborColor3 = interpolate(v_pos[1] - 3.0f);
+
+			neighborColor2 = mix(neighborColor2, neighborColor1, 0.5f);
+
+			neighborColor3 = mix(neighborColor3, neighborColor2, 0.5f);
+
+			objectColor = mix(objectColor, neighborColor3, 0.5f);
+
+			vec3 lightColor = vec3(1, 1, 1);
+
+			float ambientStrength = 0.1f;
+
+			vec3 normal = normalize(v_normal);
+
+			vec3 lightDirection = normalize(lightPos - v_pos);
+
+			// calculate the diffuse impact on the fragment
+			// if the lightDirection is perpendicular to the surface or parallel to the normal
+			// then diffusion will have the greatest impact
+			// if the lightDirection is paralell to the surface or perpendicular to the normal
+			// then diffusion is zero (no impact on surface)
+			float diff = max(dot(normal, lightDirection), 0.0f);
+
+			vec3 diffuse = diff * lightColor;
+			vec3 ambient = ambientStrength * lightColor;
+			vec3 result = (ambient + diffuse) * objectColor;
+
+			outColor = vec4(result, 1);
+		}
+	</script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

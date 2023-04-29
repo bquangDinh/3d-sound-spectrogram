@@ -1,6 +1,18 @@
 export class Shader {
 	private _shader: WebGLShader
 
+	static fromScript(scriptTagId: string, shaderType: number, gl: WebGL2RenderingContext) {
+		const source = document.querySelector(`#${scriptTagId}`)
+
+		if (!source) {
+			throw new Error(`Scipt not found with ID: ${scriptTagId}`)
+		}
+
+		const content = source.innerHTML.trim()
+
+		return new Shader(gl, content, shaderType)
+	}
+
 	constructor(
 		private gl: WebGL2RenderingContext,
 		source: string,

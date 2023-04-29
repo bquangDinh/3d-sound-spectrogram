@@ -13,7 +13,7 @@ export class MarchingCube {
 
 	public keysMap: Record<string, boolean> = {}
 
-	public ffts: Uint8Array = new Uint8Array()
+	private ffts: Uint8Array[] = []
 
 	private perspectiveMatrix: mat4 = mat4.create()
 
@@ -56,20 +56,18 @@ export class MarchingCube {
 
 	private readonly ISO_LEVEL = 0
 
-	private vertices: vec4[] = []
+	// Hold grid data of FFTs
+	private data: vec4[] = []
 
-	private mVertices: number[] = []
-
-	private readonly WAIT = 1
-
-	private time = 0
-
-	private z_Index = 0
+	// Hold vertices data for WebGL draw call
+	private vertices: number[] = []
 
 	constructor(
 		private gl: WebGL2RenderingContext
 	) {
-		mat4.perspective(this.perspectiveMatrix, glMatrix.toRadian(45.0), gl.canvas.width / gl.canvas.height, 0.1, 200)
+		// Calculating aspect by canvas.width / canvas.height is not recommended since CSS may influenced the size
+		// Should use canvas.clientWidth and canvas.clientHeight since those are constants and not influeced by CSS
+		mat4.perspective(this.perspectiveMatrix, glMatrix.toRadian(45.0), (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight, 0.1, 200)
 	}
 
 	public init () {
@@ -82,77 +80,10 @@ export class MarchingCube {
 		// Set GL viewport
 		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-		// Declare Vertex Shader Source
-		const vertexShaderSource = `#version 300 es
+		// Create Shaders
+		const vertexShader = Shader.fromScript('vertex-shader', gl.VERTEX_SHADER, gl)
 
-			// an attribute is an input (in) to a vertex shader.
-			// It will receive data from a buffer
-			in vec3 a_position;
-
-			in vec3 a_normal;
-
-			uniform mat4 model;
-			uniform mat4 view;
-			uniform mat4 projection;
-
-			out vec3 v_normal;
-			out vec3 v_pos;
-
-			// all shaders have a main function
-			void main() {
-				gl_Position = projection * view * vec4(a_position, 1.0f);
-
-				// pass to fragment shader
-				v_normal = a_normal;
-				v_pos = a_position;
-			}
-		`;
-
-		// Declare Fragment Shader Source
-		const fragmentShaderSource = `#version 300 es
-
-			// fragment shaders don't have a default precision so we need
-			// to pick one. highp is a good default. It means "high precision"
-			precision highp float;
-
-			out vec4 outColor;
-
-			uniform vec3 lightPos;
-			uniform float maxHeight;
-
-			in vec3 v_normal;
-			in vec3 v_pos;
-
-			void main() {
-				float percentage = v_pos[1] / maxHeight;
-
-				vec3 lightColor = vec3(1, 1, 1);
-				vec3 objectColor = vec3(1, 0, percentage);
-				float ambientStrength = 0.1f;
-
-				vec3 normal = normalize(v_normal);
-				vec3 lightDirection = normalize(lightPos - v_pos);
-
-				// calculate the diffuse impact on the fragment
-				// if the lightDirection is perpendicular to the surface or parallel to the normal
-				// then diffusion will have the greatest impact
-				// if the lightDirection is paralell to the surface or perpendicular to the normal
-				// then diffusion is zero (no impact on surface)
-				float diff = max(dot(normal, lightDirection), 0.0f);
-
-				vec3 diffuse = diff * lightColor;
-
-				vec3 ambient = ambientStrength * lightColor;
-
-				vec3 result = (ambient + diffuse) * objectColor;
-
-				outColor = vec4(result, 1);
-			}
-		`;
-
-		const vertexShader = new Shader(gl, vertexShaderSource, gl.VERTEX_SHADER)
-
-		const fragmentShader = new Shader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER)
+		const fragmentShader =  Shader.fromScript('fragment-shader', gl.FRAGMENT_SHADER, gl)
 
 		// Create Shader Program
 		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
@@ -160,26 +91,36 @@ export class MarchingCube {
 		this.shaderProgram = shaderProgram
 
 		// Set this current program as default use
+		// Since there is only one program so I don't need to switch
 		shaderProgram.use()
 
+		// Save attribute locations
 		this.positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
 
 		this.normalAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_normal')
 
+		// Create VAO and Array Buffers
 		this.VAO = gl.createVertexArray()
 
 		this.verticesBuffer = gl.createBuffer()
 
 		this.indicesBuffer = gl.createBuffer()
 
+		// Set light position
 		shaderProgram.setVec3('lightPos', [0.5, 0.7, 1])
 
+		// Set maxHeight attribute
+		// maxHeight is the maximum allowed y coordinate of vertex
+		// I use maxHeight to calculate color that based on height
 		shaderProgram.setFloat('maxHeight', this.DIMENSIONS[1] * this.VOXEL_SIZE);
 
+		// Initialize vertices data array
+		// Each data is a vec4 contains x, y, z coordinate of the point and density value as 0
+		// call z -> y -> z is COLUMN-MAJOR order
 		for (let z = 0; z < this.DIMENSIONS[2]; ++z) {
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
-					this.vertices.push(
+					this.data.push(
 						vec4.fromValues(x * this.VOXEL_SIZE, y * this.VOXEL_SIZE, z * this.VOXEL_SIZE, 0)
 					)
 				}
@@ -189,27 +130,35 @@ export class MarchingCube {
 
 	// Will be called every frame
 	public update (dt: number) {
-		 // Turn on culling. By default backfacing triangles
+		this.resizeCanvasToDisplaySize()
+
+		// Turn on culling. By default backfacing triangles
 		// will be culled.
 		this.gl.enable(this.gl.CULL_FACE);
 
 		// Enable the depth buffer
 		this.gl.enable(this.gl.DEPTH_TEST);
 
-		this.time += dt
+		// Magic here
+		this.drawFFT()
 
-		if (this.time < this.WAIT) {
-			this.z_Index = ++this.z_Index % this.DIMENSIONS[2]
-			this.time = 0
-		}
-
-		this.testDrawingFFt()
-
+		// Update matrixes
 		this.shaderProgram.setMatrix4('projection', this.perspectiveMatrix)
 		this.shaderProgram.setMatrix4('view', this.camera.getViewMatrix())
 	}
 
-	private testDrawingFFt () {
+	// Detech changes in canvas size and change canvas size accordingly
+	private resizeCanvasToDisplaySize () {
+		const width = (this.gl.canvas as HTMLCanvasElement).clientWidth
+		const height = (this.gl.canvas as HTMLCanvasElement).clientHeight
+
+		if (this.gl.canvas.width !== width || this.gl.canvas.height !== height) {
+			this.gl.canvas.width = width
+			this.gl.canvas.height = height
+		}
+	}
+
+	private drawFFT () {
 		const gl = this.gl
 
 		if (!gl) {
@@ -221,49 +170,61 @@ export class MarchingCube {
 
 		const MAX_HEIGHT = this.VOXEL_SIZE * this.DIMENSIONS[1]
 
-		const MAX_HEIGHT_FFT = max(this.ffts) ?? 0
+		let height: number, value: number, index: number, maxHeightFFT: number, fft: Uint8Array
 
-		// There are some cases when FFT data is all zero, resulting in MAX_HEIGHT_FFT is also zero
-		// To prevent dividing to zero, just terminate here
-		if (MAX_HEIGHT_FFT === 0) return
+		// Update every vertices's densities
+		for (let z = 0; z < this.DIMENSIONS[2]; ++z) {
+			// fft[z] is undefined here so skip this iteration
+			if (z >= this.ffts.length) {
+				continue
+			}
 
-		let height: number, value: number, index: number
+			fft = this.ffts[z]
 
-		// Fetch FFT data into the vertices array
-		// Since x, y, z component of a point are not changed, only the d component is changed by the FFT data
-		// so I make some jumpy move here to access the d part
-		for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
-			for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
-				index = NumberUtils.getIndexFromXYZ(x, y, this.z_Index, this.DIMENSIONS)
+			maxHeightFFT = max(fft) ?? 0
 
-				if (x >= this.ffts.length) {
-					height = 0
-				} else {
-					height = NumberUtils.normalize({
-						value: this.ffts[x],
-						fromRange: {
-							min: 0,
-							max: MAX_HEIGHT_FFT
-						},
-						toRange: {
-							min: 0,
-							max: MAX_HEIGHT
-						}
-					})
-				}
+			// For some rare cases
+			// Like with the Airpods that has a very powerful noise-canceling tech built-in
+			// The FFT graph may come out empty leading to maxHeightFFT = 0
+			// Dividing to zero is forbidden
+			// So to make sure it doesn't happen, just skip this iteration
+			if (maxHeightFFT === 0) continue
 
-				value = height - this.vertices[index][1]
+			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
+				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
+					index = NumberUtils.getIndexFromXYZ(x, y, z, this.DIMENSIONS)
 
-				if (value < 0 || height === 0) {
-					this.vertices[index][3] = 0
-				} else {
-					this.vertices[index][3] = value / height
+					if (x >= fft.length) {
+						// No data at x, then height is 0
+						height = 0
+					} else {
+						height = NumberUtils.normalize({
+							value: fft[x],
+							fromRange: {
+								min: 0,
+								max: maxHeightFFT
+							},
+							toRange: {
+								min: 0,
+								max: MAX_HEIGHT
+							}
+						})
+					}
+
+					value = height - this.data[index][1]
+
+					// Update densities
+					if (value < 0 || height === 0) {
+						this.data[index][3] = 0
+					} else {
+						this.data[index][3] = value / height
+					}
 				}
 			}
 		}
 
 		// Clear old data
-		this.mVertices = []
+		this.vertices = []
 
 		// Triangulate based on vertices FFT data
 		this.triangulate()
@@ -275,7 +236,7 @@ export class MarchingCube {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
 		// Fetch data into buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.mVertices), gl.DYNAMIC_DRAW)
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW)
 
 		// Fetch data into position attribute from the buffer
 		// Enable the attribute in the shader program
@@ -305,7 +266,7 @@ export class MarchingCube {
 		gl.clearColor(0, 0, 0, 0)
 		gl.clear(gl.COLOR_BUFFER_BIT)
 
-		gl.drawArrays(gl.TRIANGLES, 0, this.mVertices.length / 6)
+		gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / 6)
 	}
 
 	private triangulate () {
@@ -335,11 +296,7 @@ export class MarchingCube {
 							this.DIMENSIONS
 						)
 
-						// if (index > 73700) {
-						// 	console.log(this.vertices[index][2])
-						// }
-
-						cube.push(this.vertices[index])
+						cube.push(this.data[index])
 					}
 
 					this.triangulateCube([...cube])
@@ -356,8 +313,6 @@ export class MarchingCube {
 		let cubeIndex = 0
 
 		for (let i = 0; i < 8; ++i) {
-			// console.log(cube[i][2]) // z !== 0
-
 			if (cube[i][3] > this.ISO_LEVEL) {
 				cubeIndex |= 1 << i
 			}
@@ -418,13 +373,20 @@ export class MarchingCube {
 		// return vec3.fromValues(p[0], p[1], p[2])
 	}
 
+	/**
+	 * Add triangle points and its normal surface to vertices array buffer
+	 * @param p1 1st point
+	 * @param p2 2nd point
+	 * @param p3 3rd point
+	 */
 	private addTriangle(p1: vec3, p2: vec3, p3: vec3) {
+		// Calculate normal vector
 		const p12 = vec3.sub(vec3.create(), p1, p2)
 		const p13 = vec3.sub(vec3.create(), p1, p3)
 
 		const normal = vec3.cross(vec3.create(), p12, p13)
 
-		this.mVertices.push(
+		this.vertices.push(
 			p1[0], p1[1], p1[2], normal[0], normal[1], normal[2],
 			p2[0], p2[1], p2[2], normal[0], normal[1], normal[2],
 			p3[0], p3[1], p3[2], normal[0], normal[1], normal[2],
@@ -510,6 +472,10 @@ export class MarchingCube {
 		gl.drawElements(gl.TRIANGLES, this.cube_indices.length, gl.UNSIGNED_SHORT, 0)
 	}
 
+	/**
+	 * Process Keyboard Input
+	 * @param dt
+	 */
 	public processKeyInput (dt: number) {
 		if (this.keysMap['KeyW']) {
 			this.camera.moveForward(dt)
@@ -528,7 +494,31 @@ export class MarchingCube {
 		}
 	}
 
+	/**
+	 * Process Mouse Input
+	 * @param mouseX
+	 * @param mouseY
+	 */
 	public processMouseInput (mouseX: number, mouseY: number) {
 		this.camera.turnAround(mouseX, mouseY)
+	}
+
+	/**
+	 * Add FFT data to the grid
+	 * @param fft
+	 */
+	public addFFT(fft: Uint8Array) {
+		// If the array is full, then throw the old one
+		if (this.ffts.length > this.DIMENSIONS[2]) {
+			this.ffts.shift()
+		}
+
+		// clone fft array
+		const clone = new Uint8Array(fft.length)
+
+		clone.set(fft)
+
+		// add to ffts
+		this.ffts.push(clone)
 	}
 }

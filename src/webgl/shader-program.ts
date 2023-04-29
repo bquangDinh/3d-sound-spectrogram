@@ -34,8 +34,10 @@ export class ShaderProgram {
 				// Since the program has linked shaders into memory
 				// Separated shaders won't be needed
 				if (shader instanceof Shader) {
+					gl.detachShader(program, shader.shader)
 					shader.delete()
 				} else {
+					gl.detachShader(program, shader)
 					gl.deleteShader(shader)
 				}
 			}
