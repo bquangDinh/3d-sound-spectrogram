@@ -9,6 +9,8 @@ import { EdgeVertexIndices, TriangleTable } from "./lookup-table";
 export class MarchingCube {
 	private shaderProgram!: ShaderProgram
 
+	private shadowShaderProgram!: ShaderProgram
+
 	private camera: Camera = new Camera()
 
 	public keysMap: Record<string, boolean> = {}
@@ -17,6 +19,8 @@ export class MarchingCube {
 
 	/* Shader Program Properties */
 	private uniformSetters: Record<string, Function> = {}
+
+	private shadowUniformSetters: Record<string, Function> = {}
 
 	// Shader Attribute Locations
 	private positionAttributeLocation: number = -1
@@ -27,6 +31,10 @@ export class MarchingCube {
 	private verticesBuffer: WebGLBuffer | null = null
 
 	private indicesBuffer: WebGLBuffer | null = null
+
+	private depthFrameBuffer: WebGLFramebuffer | null = null
+
+	private depthTexture: WebGLTexture | null = null
 
 	private VAO: WebGLVertexArrayObject | null = null
 
@@ -51,11 +59,17 @@ export class MarchingCube {
 		4, 5, 0, 0, 5, 1
 	]
 
+	// Grid dimensions
 	private readonly DIMENSIONS: vec3 = [512, 24, 50]
 
+	// Voxel size is the distance between 2 data points
 	private readonly VOXEL_SIZE = 1
 
 	private readonly ISO_LEVEL = 0
+
+	private readonly SHADOW_WIDTH = 1024
+
+	private readonly SHADOW_HEIGHT = 1024
 
 	// Hold grid data of FFTs
 	private data: vec4[] = []
@@ -74,34 +88,65 @@ export class MarchingCube {
 			throw new Error('No WebGL2Context found')
 		}
 
-		// Set GL viewport
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
 		// Create Shaders
 		const vertexShader = Shader.fromScript('vertex-shader', gl.VERTEX_SHADER, gl)
 
 		const fragmentShader =  Shader.fromScript('fragment-shader', gl.FRAGMENT_SHADER, gl)
+
+		// Shaders for shadow
+		const sVertexShader = Shader.fromScript('shadow-vertex-shader', gl.VERTEX_SHADER, gl)
+
+		const sFragmentShader = Shader.fromScript('shadow-fragment-shader', gl.FRAGMENT_SHADER, gl)
 
 		// Create Shader Program
 		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
 
 		this.shaderProgram = shaderProgram
 
-		// Set this current program as default use
-		// Since there is only one program so I don't need to switch
-		shaderProgram.use()
+		// Create shadow Shader Program
+		const shadowShaderProgram = new ShaderProgram(gl, [sVertexShader, sFragmentShader])
+
+		this.shadowShaderProgram = shadowShaderProgram
+
+		// // Set this current program as default use
+		// // Since there is only one program so I don't need to switch
+		// shaderProgram.use()
 
 		// Get Uniform Setters
 		this.uniformSetters = shaderProgram.createUniformSetters()
 
-		// Save some matrixs at initialization
+		this.shadowUniformSetters = shadowShaderProgram.createUniformSetters()
 
+		/* Set uniforms for shader program */
+		/* Calculate lightSpaceMatrix */
+		const lightPos = vec3.fromValues(50, 100, 20)
+
+		const lightProjection = mat4.ortho(
+			mat4.create(),
+			-(gl.canvas as HTMLCanvasElement).clientWidth / 2,
+			(gl.canvas as HTMLCanvasElement).clientWidth / 2,
+			-(gl.canvas as HTMLCanvasElement).clientHeight / 2,
+			(gl.canvas as HTMLCanvasElement).clientHeight / 2,
+			0.1,
+			200
+		)
+
+		// lookAt from the light source location to the center of the space (0,0,0)
+		const lightView = mat4.lookAt(mat4.create(), lightPos, vec3.fromValues(0, 0, 0), vec3.fromValues(0, 1, 0))
+
+		// Construct lightSpaceMatrix
+		const lightSpaceMatrix = mat4.multiply(mat4.create(), lightProjection, lightView)
+
+		// Save some matrixs at initialization
 		// Calculating aspect by canvas.width / canvas.height is not recommended since CSS may influenced the size
 		// Should use canvas.clientWidth and canvas.clientHeight since those are constants and not influeced by CSS
+		shaderProgram.use()
+
 		shaderProgram.setUniforms(this.uniformSetters, {
 			'projection': mat4.perspective(mat4.create(), glMatrix.toRadian(45.0), (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight, 0.1, 200),
-			'lightPos': [0.5, 0.7, 1],
+			'lightPos': lightPos,
 			'maxHeight': this.DIMENSIONS[1] * this.VOXEL_SIZE,
+			'lightSpaceMatrix': lightSpaceMatrix,
 		})
 
 		// Save attribute locations
@@ -109,12 +154,91 @@ export class MarchingCube {
 
 		this.normalAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_normal')
 
+		shadowShaderProgram.use()
+
+		/* Set uniforms for shadow shader program */
+		shadowShaderProgram.setUniforms(this.shadowUniformSetters, {
+			'lightSpaceMatrix': lightSpaceMatrix
+		})
+
+		gl.useProgram(null)
+
 		// Create VAO and Array Buffers
 		this.VAO = gl.createVertexArray()
 
 		this.verticesBuffer = gl.createBuffer()
 
 		this.indicesBuffer = gl.createBuffer()
+
+		this.depthFrameBuffer = gl.createFramebuffer()
+
+		// Generate depth texture
+		this.depthTexture = gl.createTexture()
+
+		gl.bindTexture(gl.TEXTURE_2D, this.depthTexture)
+
+		gl.texImage2D(
+			gl.TEXTURE_2D,
+			0,
+			gl.DEPTH_COMPONENT24, // internal format
+			1024, // width
+			1024, // height
+			0, // border,
+			gl.DEPTH_COMPONENT, // format
+			gl.UNSIGNED_INT, // type
+			null // no pixels at this moment
+		)
+
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+		// Attach depth texture to depth buffer
+		gl.bindFramebuffer(gl.FRAMEBUFFER, this.depthFrameBuffer)
+
+		gl.framebufferTexture2D(
+			gl.FRAMEBUFFER,
+			gl.DEPTH_ATTACHMENT,
+			gl.TEXTURE_2D,
+			this.depthTexture,
+			0
+		)
+
+		// Attach color texture to depth buffer (won't be used but still required)
+		const unusedTexture = gl.createTexture()
+
+		gl.bindTexture(gl.TEXTURE_2D, unusedTexture)
+
+		gl.texImage2D(
+			gl.TEXTURE_2D,
+			0,
+			gl.RGBA,
+			1024,
+			1024,
+			0,
+			gl.RGBA,
+			gl.UNSIGNED_BYTE,
+			null,
+		)
+
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+		// Attach color texture to depth frame buffer
+		gl.framebufferTexture2D(
+			gl.FRAMEBUFFER,
+			gl.COLOR_ATTACHMENT0,
+			gl.TEXTURE_2D,
+			unusedTexture,
+			0
+		)
+
+		// Since setting up the depth frame buffer is now done
+		// We can switch back to our default frame buffer
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null)
 
 		// Initialize vertices data array
 		// Each data is a vec4 contains x, y, z coordinate of the point and density value as 0
@@ -134,40 +258,14 @@ export class MarchingCube {
 	public update (dt: number) {
 		this.resizeCanvasToDisplaySize()
 
-		// Turn on culling. By default backfacing triangles
-		// will be culled.
-		this.gl.enable(this.gl.CULL_FACE);
+		// Updating states for the program
+		this.updateFFT()
 
-		// Enable the depth buffer
-		this.gl.enable(this.gl.DEPTH_TEST);
-
-		// Magic here
-		this.drawFFT()
-
-		// Update view matrix
-		this.shaderProgram.setUniforms(this.uniformSetters, {
-			'view': this.camera.getViewMatrix()
-		})
+		// Render scene
+		this.render()
 	}
 
-	// Detech changes in canvas size and change canvas size accordingly
-	private resizeCanvasToDisplaySize () {
-		const width = (this.gl.canvas as HTMLCanvasElement).clientWidth
-		const height = (this.gl.canvas as HTMLCanvasElement).clientHeight
-
-		if (this.gl.canvas.width !== width || this.gl.canvas.height !== height) {
-			this.gl.canvas.width = width
-			this.gl.canvas.height = height
-		}
-	}
-
-	private drawFFT () {
-		const gl = this.gl
-
-		if (!gl) {
-			throw new Error('No WebGL2Context found')
-		}
-
+	private updateFFT () {
 		// If FFT data is empty, then nothing to do here
 		if (this.ffts.length === 0) return
 
@@ -225,12 +323,93 @@ export class MarchingCube {
 				}
 			}
 		}
+	}
+
+	private render () {
+		const gl = this.gl
+
+		if (!gl) {
+			throw new Error('No WebGL2Context found')
+		}
+
+		// Turn on culling. By default backfacing triangles
+		// will be culled.
+		gl.enable(gl.CULL_FACE);
+
+		// Enable the depth buffer
+		gl.enable(gl.DEPTH_TEST);
+
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+		this.shadowShaderProgram.use()
+
+		gl.viewport(0, 0, this.SHADOW_WIDTH, this.SHADOW_HEIGHT)
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, this.depthFrameBuffer)
+
+		// Make canvas transparent
+		gl.clearColor(0, 0, 0, 0)
+
+		gl.clear(gl.DEPTH_BUFFER_BIT)
+
+		// Magic here
+		this.drawScene(this.shadowShaderProgram)
+
+		// Reset to normal
+		// Set GL viewport
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+
+		// Bind the shadow map (after rendered in shadow stage) to the main shader program
+		if (this.depthTexture) {
+			this.shaderProgram.setUniforms(this.uniformSetters, {
+				'depthMap': this.depthTexture
+			})
+		} else {
+			console.warn('Depth Texture is null')
+		}
+
+		this.drawScene()
+
+		this.shaderProgram.use()
+
+		// Update view matrix
+		this.shaderProgram.setUniforms(this.uniformSetters, {
+			'view': this.camera.getViewMatrix()
+		})
+
+		gl.useProgram(null)
+	}
+
+	// Detech changes in canvas size and change canvas size accordingly
+	private resizeCanvasToDisplaySize () {
+		const width = (this.gl.canvas as HTMLCanvasElement).clientWidth
+		const height = (this.gl.canvas as HTMLCanvasElement).clientHeight
+
+		if (this.gl.canvas.width !== width || this.gl.canvas.height !== height) {
+			this.gl.canvas.width = width
+			this.gl.canvas.height = height
+		}
+	}
+
+	private drawScene (program?: ShaderProgram) {
+		const gl = this.gl
+
+		if (!gl) {
+			throw new Error('No WebGL2Context found')
+		}
+
+		const shaderProgram = program ?? this.shaderProgram
 
 		// Clear old data
 		this.vertices = []
 
 		// Triangulate based on vertices FFT data
 		this.triangulate()
+
+		// Use this program to render
+		shaderProgram.use()
 
 		// Use VAO
 		gl.bindVertexArray(this.VAO)
@@ -264,10 +443,6 @@ export class MarchingCube {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
 		gl.bindVertexArray(this.VAO)
-
-		// Make canvas transparent
-		gl.clearColor(0, 0, 0, 0)
-		gl.clear(gl.COLOR_BUFFER_BIT)
 
 		gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / 6)
 

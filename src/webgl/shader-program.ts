@@ -1,7 +1,7 @@
 import { Shader } from "./shader"
 import { mat2, mat3, mat4, vec2, vec3, vec4 } from "gl-matrix"
 
-export type AllowUniformTypes = number | number[] | vec2 | vec3 | vec4 | mat2 | mat3 | mat4
+export type AllowUniformTypes = number | number[] | vec2 | vec3 | vec4 | mat2 | mat3 | mat4 | WebGLTexture
 
 export class ShaderProgram {
 	private _shaderProgram: WebGLProgram
@@ -89,6 +89,15 @@ export class ShaderProgram {
 	// Inspired by https://webglfundamentals.org/webgl/resources/webgl-utils.js
 	public createUniformSetters() {
 		const gl = this.gl
+
+		let textureUnit = 0
+
+		const getBindPointForSamplerType = (type: number) => {
+			if (type === gl.SAMPLER_2D)   return gl.TEXTURE_2D;        // eslint-disable-line
+			if (type === gl.SAMPLER_CUBE) return gl.TEXTURE_CUBE_MAP;  // eslint-disable-line
+
+			throw new Error('Must be SAMPLER_2D or SAMPLER_CUBE')
+		}
 
 		/**
 		 * Creates a setter for a uniform of the given program with it's
@@ -187,7 +196,33 @@ export class ShaderProgram {
 				}
 			}
 
-			throw new Error(`${uniformInfo} is not supported`)
+			if ((type === gl.SAMPLER_2D || type === gl.SAMPLER_CUBE) && isArray) {
+				const units = [];
+				for (let ii = 0; ii < uniformInfo.size; ++ii) {
+				  units.push(textureUnit++);
+				}
+				return function(bindPoint, units) {
+				  return function(textures: WebGLTexture[]) {
+					gl.uniform1iv(location, units);
+					textures.forEach(function(texture, index) {
+					  gl.activeTexture(gl.TEXTURE0 + units[index]);
+					  gl.bindTexture(bindPoint, texture);
+					});
+				  };
+				}(getBindPointForSamplerType(type), units);
+			}
+
+			if (type === gl.SAMPLER_2D || type === gl.SAMPLER_CUBE) {
+				return function(bindPoint, unit) {
+				  return function(texture: WebGLTexture) {
+					gl.uniform1i(location, unit);
+					gl.activeTexture(gl.TEXTURE0 + unit);
+					gl.bindTexture(bindPoint, texture);
+				  };
+				}(getBindPointForSamplerType(type), textureUnit++);
+			}
+
+			throw new Error(`${uniformInfo.name} is not supported`)
 		}
 
 		const uniformSetters: Record<string, Function> = {}

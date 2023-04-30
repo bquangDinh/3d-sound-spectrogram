@@ -13,6 +13,7 @@
 			<canvas id="spectrogram-canvas"></canvas>
 		</div>
 	</div>
+	<!--Shaders for main shader program-->
 	<script type="x-shader/x-vertex" id="vertex-shader">
 		#version 300 es
 
@@ -24,17 +25,21 @@
 		uniform mat4 model;
 		uniform mat4 view;
 		uniform mat4 projection;
+		uniform mat4 lightSpaceMatrix;
 
-		out vec3 v_normal;
-		out vec3 v_pos;
+		// to fragment shader
+		out vec3 normal;
+		out vec3 fragPos;
+		out vec4 fragPosLightSpace;
 
 		// all shaders have a main function
 		void main() {
 			gl_Position = projection * view * vec4(a_position, 1.0f);
 
 			// pass to fragment shader
-			v_normal = a_normal;
-			v_pos = a_position;
+			normal = a_normal;
+			fragPos = a_position;
+			fragPosLightSpace = lightSpaceMatrix * vec4(a_position, 1.0f);
 		}
 	</script>
 	<script type="x-shader/x-fragment" id="fragment-shader">
@@ -43,14 +48,22 @@
 		// fragment shaders don't have a default precision so we need
 		// to pick one. highp is a good default. It means "high precision"
 		precision highp float;
+
 		out vec4 outColor;
 
+		uniform sampler2D depthMap;
 		uniform vec3 lightPos;
 		uniform float maxHeight;
 
-		in vec3 v_normal;
-		in vec3 v_pos;
+		in vec3 normal;
+		in vec3 fragPos;
+		in vec4 fragPosLightSpace;
 
+		/* For debugging DEPTH */
+		float near = 0.1f;
+		float far = 200.0f;
+
+		// interpolate frag color based on its height (y component)
 		vec3 interpolate(float height) {
 			float percentage = height / maxHeight;
 
@@ -73,28 +86,48 @@
 			return objectColor;
 		}
 
-		void main() {
-			vec3 objectColor = interpolate(v_pos[1]);
+		float linearizeDepth (float depth) {
+			float z = depth * 2.0f - 1.0f; // [0,1] -> [-1, 1]
 
-			vec3 neighborColor1 = interpolate(v_pos[1] - 1.0f);
+			// derived from inverse transformation
+			// lot of math!
+			// source here: https://www.songho.ca/opengl/gl_projectionmatrix.html
+			return (2.0f * near * far) / (far + near - z * (far - near));
+		}
 
-			vec3 neighborColor2 = interpolate(v_pos[1] - 2.0f);
+		// Check whether this fragment is in shadow
+		// fragPosLightSpace is the frag position after lightSpaceMatrix transformation
+		float calculateShadow (vec4 fragPosLightSpace) {
+			// perform perspective divider
+			// tranform point to NDC [-1, 1]
+			vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
-			vec3 neighborColor3 = interpolate(v_pos[1] - 3.0f);
+			// Since the depth map is in range [0, 1]
+			// we need to transform projCoords to [0, 1] as well to perform comparation
+			projCoords = projCoords * 0.5f + 0.5f;
 
-			neighborColor2 = mix(neighborColor2, neighborColor1, 0.5f);
+			// Get the closest depth where the light first hits at this projection coordinate
+			// Since the depth map is black-white, so only red channel is meaningful
+			float closestDepth = texture(depthMap, projCoords.xy).r;
 
-			neighborColor3 = mix(neighborColor3, neighborColor2, 0.5f);
+			// Get the current depth
+			float currentDepth = projCoords.z;
 
-			objectColor = mix(objectColor, neighborColor3, 0.5f);
+			// Check whether the current depth is higher than the closest depth
+			// If it is, then this fragment is in shadow
+			float shadow = currentDepth > closestDepth ? 1.0f : 0.0f;
 
+			return shadow;
+		}
+
+		vec3 calculateLighting (vec3 objectColor) {
 			vec3 lightColor = vec3(1, 1, 1);
 
 			float ambientStrength = 0.1f;
 
-			vec3 normal = normalize(v_normal);
+			vec3 normal = normalize(normal);
 
-			vec3 lightDirection = normalize(lightPos - v_pos);
+			vec3 lightDirection = normalize(lightPos - fragPos);
 
 			// calculate the diffuse impact on the fragment
 			// if the lightDirection is perpendicular to the surface or parallel to the normal
@@ -104,15 +137,69 @@
 			float diff = max(dot(normal, lightDirection), 0.0f);
 
 			vec3 diffuse = diff * lightColor;
-			vec3 ambient = ambientStrength * lightColor;
-			vec3 result = (ambient + diffuse) * objectColor;
 
-			// apply gamma correction
+			vec3 ambient = ambientStrength * lightColor;
+
+			float shadow = calculateShadow(fragPosLightSpace);
+
+			vec3 result = (ambient + (1.0f - shadow) * diffuse) * objectColor;
+
+			return result;
+		}
+
+		void main() {
+			/* Interpolate object base color from height */
+			vec3 objectColor = interpolate(fragPos[1]);
+
+			vec3 neighborColor1 = interpolate(fragPos[1] - 1.0f);
+
+			vec3 neighborColor2 = interpolate(fragPos[1] - 2.0f);
+
+			vec3 neighborColor3 = interpolate(fragPos[1] - 3.0f);
+
+			neighborColor2 = mix(neighborColor2, neighborColor1, 0.5f);
+
+			neighborColor3 = mix(neighborColor3, neighborColor2, 0.5f);
+
+			objectColor = mix(objectColor, neighborColor3, 0.5f);
+
+			/* Apply lighting to object base color */
+			vec3 result = calculateLighting(objectColor);
+
+			/* Apply Gamma Correction */
 			float gamma = 2.2f;
 
 			outColor = vec4(result, 1);
 
 			outColor.rgb = pow(outColor.rgb, vec3(1.0f / gamma));
+
+			// FOR DEBUGGING DEPTH
+			// float depth = linearizeDepth(gl_FragCoord.z) / far;
+
+			// outColor = vec4(vec3(depth), 1.0f);
+		}
+	</script>
+	<!--Shaders for shadow shader program-->
+	<script type="x-shader/x-vertex" id="shadow-vertex-shader">
+		#version 300 es
+
+		in vec3 a_pos;
+
+		uniform mat4 lightSpaceMatrix; // matrix use to transform a point in to light point of view
+
+		void main () {
+			gl_Position = lightSpaceMatrix * vec4(a_pos, 1.0f);
+		}
+	</script>
+	<script type="x-shader/x-fragment" id="shadow-fragment-shader">
+		#version 300 es
+
+		// fragment shaders don't have a default precision so we need
+		// to pick one. highp is a good default. It means "high precision"
+		precision highp float;
+
+		void main () {
+			// gl_FragDepth = gl_FragCoord.z; // this line is performed by WebGL so I just here for clarity
 		}
 	</script>
     <script type="module" src="/src/main.ts"></script>
