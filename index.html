@@ -107,7 +107,12 @@
 			vec3 ambient = ambientStrength * lightColor;
 			vec3 result = (ambient + diffuse) * objectColor;
 
+			// apply gamma correction
+			float gamma = 2.2f;
+
 			outColor = vec4(result, 1);
+
+			outColor.rgb = pow(outColor.rgb, vec3(1.0f / gamma));
 		}
 	</script>
     <script type="module" src="/src/main.ts"></script>

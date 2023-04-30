@@ -1,7 +1,7 @@
 import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 import { Camera } from "./camera";
 import { Shader } from "./webgl/shader";
-import { AllowUniformTypes, ShaderProgram } from "./webgl/shader-program";
+import { ShaderProgram } from "./webgl/shader-program";
 import { NumberUtils } from "./utils";
 import { max } from "lodash";
 import { EdgeVertexIndices, TriangleTable } from "./lookup-table";
@@ -270,6 +270,9 @@ export class MarchingCube {
 		gl.clear(gl.COLOR_BUFFER_BIT)
 
 		gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / 6)
+
+		// Unbind VAO
+		gl.bindVertexArray(null)
 	}
 
 	private triangulate () {
