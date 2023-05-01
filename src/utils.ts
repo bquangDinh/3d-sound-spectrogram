@@ -1,5 +1,6 @@
 import { fft, Phasors } from "fft-js"
 import { vec2, vec3, vec4 } from "gl-matrix"
+import { CONSTANTS } from "./constants"
 
 export interface IAudioBufferOptions {
 	channel?: number
@@ -248,7 +249,7 @@ export const UIUtils = {
 				optionItem.innerHTML = select.options[j].innerHTML
 
 				// Add event
-				optionItem.addEventListener('click', (e) => {
+				optionItem.addEventListener('click', () => {
 					/**
 					 * When an option item is clicked, update the original select box
 					 * and update the selected item
@@ -314,5 +315,77 @@ export const UIUtils = {
 
 			e.stopPropagation()
 		})
+	},
+	adjustControllerLayout: () => {
+		const header = document.getElementById(CONSTANTS.DOM_ELEMENTS.HEADER_ID)
+
+		const canvasContainer = document.getElementById(CONSTANTS.DOM_ELEMENTS.CANVAS_CONTAINER_ID)
+
+		const controllerContainer = document.getElementById(CONSTANTS.DOM_ELEMENTS.CONTROLLERS_CONTAINER_ID)
+
+		if (!header || !canvasContainer || !controllerContainer) {
+			throw new Error('Invalid Layout. Please check HTML again')
+		}
+
+		// Set height of controler based on height of canvas and header
+		const height = window.innerHeight - (canvasContainer.clientHeight + header.clientHeight)
+
+		controllerContainer.style.height = `${height}px`
+
+		const controllerTitleFirstChild = document.querySelector('.controller span:first-child')
+
+		let titleTotalHeight = 0
+
+		if (controllerTitleFirstChild) {
+			const bb = controllerTitleFirstChild.getBoundingClientRect()
+
+			titleTotalHeight = bb.bottom - (canvasContainer.clientHeight + header.clientHeight)
+		}
+
+		// Set size of option-btn accordingly
+		const optionBtns = document.getElementsByClassName(CONSTANTS.DOM_ELEMENTS.OPTION_BTN_CLASSNAME) as HTMLCollectionOf<HTMLButtonElement>
+
+		const offset = 30
+
+		let size = height - titleTotalHeight - offset
+
+		for (let i = 0; i < optionBtns.length; ++i) {
+			optionBtns[i].style.height = `${size}px`
+			optionBtns[i].style.width = `${size}px`
+		}
+
+		// Set size of select-selected
+		const selectedSelects = document.querySelectorAll(`.${CONSTANTS.DOM_ELEMENTS.APP_SELECT_CLASSNAME} .select-selected`) as NodeListOf<HTMLDivElement>
+
+		for (let i = 0; i < selectedSelects.length; ++i) {
+			selectedSelects[i].style.height = `${size}px`
+		}
+	},
+	setSubHeaderText: (message: string, status: 'error' | 'warn' | 'info' | 'soundtrack-playing' | 'microphone-recording') => {
+		const subHeaderText = document.getElementById(CONSTANTS.DOM_ELEMENTS.SUB_HEADER_TEXT_ID)
+
+		if (!subHeaderText) {
+			throw new Error('There is no sub header text available')
+		}
+
+		let icon = '<i class="fa-solid fa-circle-info" style="color: #3d84ff;"></i>'
+
+		switch (status) {
+			case 'error':
+				icon = '<i class="fa-solid fa-circle-exclamation" style="color: #ff4d4d;"></i>'
+				break
+			case 'soundtrack-playing':
+				icon = '<i class="fa-solid fa-music fa-fade"></i>'
+			case 'microphone-recording':
+				icon = '<i class="fa-solid fa-microphone fa-fade"></i>'
+			case 'warn':
+				icon = '<i class="fa-solid fa-triangle-exclamation" style="color: #ffd500;"></i>'
+				break
+			case 'info':
+			default:
+				icon = '<i class="fa-solid fa-circle-info" style="color: #3d84ff;"></i>'
+		}
+
+		subHeaderText.innerHTML = `${icon} ${message}`
 	}
 }

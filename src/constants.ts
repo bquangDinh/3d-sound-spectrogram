@@ -18,6 +18,18 @@ export const CONSTANTS = {
 	DOM_ELEMENTS: {
 		CAMERA_DEBUG_POS_SPAN_ID: 'camera-pos',
 		CAMERA_DEBUG_ROT_SPAN_ID: 'camera-rot',
+		HEADER_ID: 'header',
+		CANVAS_CONTAINER_ID: 'canvas-container',
+		CANVAS_ID: 'spectrogram-canvas',
+		CONTROLLERS_CONTAINER_ID: 'controller-container',
+		CONTROLLER_CLASSNAME: 'controller',
+		APP_SELECT_CLASSNAME: 'app-select',
+		OPTION_BTNS_CLASSNAME: 'options-btn',
+		OPTION_BTN_CLASSNAME: 'option-btn',
+		SUB_HEADER_TEXT_ID: 'sub-header-text',
+		FPS_TEXT_ID: 'fps-text',
+		USE_WEBWORKER_CHECKBOX_ID: 'use-web-worker-cb',
+		WEBWORKER_CHECKBOX_CONTAINER_ID: 'webworker-cb-container'
 	},
 	RENDERERS: {
 		NAMES: {

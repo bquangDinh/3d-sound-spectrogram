@@ -10,6 +10,8 @@ import { max } from "lodash";
 export class FFT2D extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT2D
 
+	public readonly supportWebWorker = false
+
 	private shaderProgram: ShaderProgram | null = null
 
 	private uniformSetters: Record<string, Function> = {}

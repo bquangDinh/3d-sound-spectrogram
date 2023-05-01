@@ -1,0 +1,302 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: black;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Variables */
+$white-color: #ededed;
+$successColor: #1abc9c;
+$errorColor: #e74c3c;
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+/* Utils CSS*/
+.center-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+
+	&--row {
+		flex-direction: row;
+	}
+
+	&--column {
+		flex-direction: column;
+	}
+}
+
+.d-hide {
+	visibility: hidden;
+}
+
+.d-none {
+	display: none;
+}
+
+#app {
+	margin: 0 auto;
+	height: 100vh;
+	overflow: hidden;
+}
+
+#header {
+	text-align: center;
+}
+
+#canvas-container {
+	width: 100%;
+	height: 75vh;
+	background-color: black;
+	margin: 10px 0 10px 0;
+}
+
+#spectrogram-canvas {
+	width: 100%;
+	height: 100%;
+}
+
+#controller-container {
+	flex: 1;
+	width: 100%;
+	border-top: 1px solid gray;
+	min-height: 120px;
+
+	justify-content: flex-start !important;
+
+	.controller {
+		padding: 0 20px 0 20px;
+	}
+
+	.controller .title {
+		font-size: 1.2em;
+	}
+
+	.controller .content {
+		height: 50px;
+		margin-top: 5px;
+	}
+}
+
+/* Custom Select */
+.app-select {
+	position: relative;
+
+	* {
+		color: black;
+	}
+
+	select {
+		display: none; /*Hide default select*/
+	}
+
+	.select-selected {
+		min-width: 200px;
+		padding: 5px 10px 5px 10px;
+		background-color: $white-color;
+		border-radius: 10px;
+		cursor: pointer;
+
+		&--val {
+			flex: 1;
+			padding-right: 10px;
+		}
+
+		&--caret {
+			font-size: 1.3em;
+			transform: rotateZ(0);
+			transition: transform .3s;
+		}
+	}
+
+	.select-selected:hover > .select-selected--caret {
+			transform: rotateZ(-90deg);
+	}
+
+	.items {
+		background-color: $white-color;
+
+		padding: 5px;
+		position: absolute;
+		left: 0;
+		right: 0;
+
+		border-radius: 10px;
+
+		z-index: 999;
+
+		.item {
+			padding: 5px 0 5px 0;
+			text-align: center;
+			background-color: $white-color;
+			transition: background-color .3s;
+			border-radius: 5px;
+			cursor: pointer;
+			margin: 3px 0 3px 0;
+
+			&:first-child {
+				border-radius: 10px 10px 5px 5px;
+				margin-top: 0;
+			}
+
+			&:last-child {
+				border-radius: 5px 5px 10px 10px;
+				margin-bottom: 0;
+			}
+
+			&.selected {
+				background-color: darken($white-color, 40%);
+			}
+
+			&:hover {
+				background-color: darken($white-color, 20%);
+			}
+		}
+	}
+}
+
+.app-checkbox {
+	position: relative;
+	cursor: pointer;
+
+	input[type="checkbox"] {
+		display: none;
+	}
+
+	.placement {
+		position: absolute;
+		left: -25px;
+		top: 2px;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		background-color: black;
+
+		&:after {
+			content: '';
+			position: absolute;
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background-color: $errorColor;
+			top: 5px;
+			left: 5px;
+			transform: scale(1);
+			transition: all .3s;
+
+			&:hover {
+				transform: scale(2);
+			}
+		}
+
+		&:hover:after {
+			transform: scale(1.4);
+		}
+	}
+
+	input[type='checkbox']:checked ~ .placement::after {
+		background-color: $successColor;
+	}
+}
+
+.option-btns {
+	height: 50px;
+
+	.option-btn {
+		position: relative;
+		background-color: $white-color;
+		width: 40px;
+		height: 40px;
+		border: 0;
+		color: black;
+		border-radius: 10px;
+		cursor: pointer;
+		opacity: 0.5;
+		transition: all .3s;
+
+		i {
+			font-size: 1.2em;
+		}
+
+		&.disabled {
+			background-color: darken($white-color, 70%) !important;
+			cursor: not-allowed;
+		}
+
+		&[data-select="1"] {
+			opacity: 1;
+		}
+
+		.tooltip-text {
+			visibility: hidden;
+			width: 120px;
+			background-color: $white-color;
+			color: black;
+			text-align: center;
+			border-radius: 6px;
+			padding: 5px 5px;
+
+			position: absolute;
+			bottom: 120%;
+			left: 50%;
+			margin-left: -60px;
+			z-index: 1;
+			font-size: 16px;
+
+			&::after {
+				content: " ";
+				position: absolute;
+				top: 100%; /* At the bottom of the tooltip */
+				left: 50%;
+				margin-left: -5px;
+				border-width: 5px;
+				border-style: solid;
+				border-color: $white-color transparent transparent transparent;
+			}
+
+		}
+
+		&:not(.disabled):hover {
+			background-color: $white-color;
+			opacity: 1;
+		}
+
+		&:hover .tooltip-text {
+			visibility: visible;
+		}
+	}
+}

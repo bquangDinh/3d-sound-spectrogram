@@ -19,6 +19,8 @@ import Worker from '../workers/fft-3d.worker?worker'
 export class FFT3D extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT3D
 
+	public readonly supportWebWorker = true
+
 	private shaderProgram: ShaderProgram | null = null
 
 	private keysMap: Record<string, boolean> = {}
@@ -99,7 +101,9 @@ export class FFT3D extends Renderer {
 
 		this.initEvents()
 
-		this.initWorker()
+		if (this.useWebWorker) {
+			this.initWorker()
+		}
 
 		this._isInitialized = true
 
@@ -228,6 +232,8 @@ export class FFT3D extends Renderer {
 	}
 
 	public render(dt: number): void {
+		if (!this.isWebGLSupported) return
+
 		if (!this.camera) {
 			throw new Error('You forgot to init camera for FFT3D')
 		}

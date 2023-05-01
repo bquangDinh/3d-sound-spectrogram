@@ -8,10 +8,11 @@
   </head>
   <body>
     <div id="app" class="center-container center-container--column">
-		<h2>3D Sound Spectrogram - Marching Cube</h2>
-		<span>
-			<i class="fa-solid fa-triangle-exclamation" style="color: #ffd500;"></i> Your browser does not support WebGL2. Please try with another browser
-		</span>
+		<div id="header">
+			<h2>3D Sound Spectrogram - Marching Cube</h2>
+			<span id="sub-header-text">
+			</span>
+		</div>
 
 		<div id="canvas-container">
 			<canvas id="spectrogram-canvas"></canvas>
@@ -24,23 +25,25 @@
 						Soundtrack
 					</span>
 				</span>
-				<div class="app-select" style="margin-top: 5px;">
-					<div data-name="soundtrack-selected" class="select-selected center-container center-container--row">
-						<div class="select-selected--val">
-							Select a soundtrack!
+				<div class="content">
+					<div class="app-select">
+						<div data-name="soundtrack-selected" class="select-selected center-container center-container--row">
+							<div class="select-selected--val">
+								Select a soundtrack!
+							</div>
+							<div class="select-selected--caret">
+								<i class="fa-solid fa-caret-up" style="color: #000000;"></i>
+							</div>
 						</div>
-						<div class="select-selected--caret">
-							<i class="fa-solid fa-caret-up" style="color: #000000;"></i>
+						<div class="items">
 						</div>
+						<select>
+							<option selected value="NULL">Select a soundtrack!</option>
+							<option value="1">Menuet</option>
+							<option value="2">Chopin</option>
+							<option value="3">Valse de l'adieu, op. 69 no. 1</option>
+						</select>
 					</div>
-					<div class="items">
-					</div>
-					<select>
-						<option selected value="NULL">Select a soundtrack!</option>
-						<option value="1">Menuet</option>
-						<option value="2">Chopin</option>
-						<option value="3">Valse de l'adieu, op. 69 no. 1</option>
-					</select>
 				</div>
 			</div>
 			<div class="controller">
@@ -50,19 +53,21 @@
 					</span>
 				</span>
 
-				<div class="option-btns" style="margin-top: 5px;">
-					<button class="option-btn" data-ops-category="source" data-ops-value="soundtrack" data-select="0">
-						<i class="fa-solid fa-music"></i>
-						<span class="tooltip-text">
-							Source from a soundtrack
-						</span>
-					</button>
-					<button class="option-btn" data-ops-category="source" data-ops-value="mic" data-select="1">
-						<i class="fa-solid fa-microphone"></i>
-						<span class="tooltip-text">
-							Source from microphone
-						</span>
-					</button>
+				<div class="content">
+					<div class="option-btns" style="margin-top: 5px;">
+						<button class="option-btn" data-ops-category="source" data-ops-value="soundtrack" data-select="0">
+							<i class="fa-solid fa-music"></i>
+							<span class="tooltip-text">
+								Source from a soundtrack
+							</span>
+						</button>
+						<button class="option-btn" data-ops-category="source" data-ops-value="mic" data-select="1">
+							<i class="fa-solid fa-microphone"></i>
+							<span class="tooltip-text">
+								Source from microphone
+							</span>
+						</button>
+					</div>
 				</div>
 			</div>
 			<div class="controller">
@@ -72,29 +77,31 @@
 					</span>
 				</span>
 
-				<div class="option-btns" style="margin-top: 5px;">
-					<button class="option-btn" data-ops-category="cameraMovement"  data-ops-value="free" data-select="0">
-						<i class="fa-solid fa-person-running"></i>
-						<span class="tooltip-text">
-							<p>
-								Free to move around the scene.
-							</p>
-							<p>
-								Disabled when selecting 2D Graph
-							</p>
-						</span>
-					</button>
-					<button class="option-btn" data-ops-category="cameraMovement"  data-ops-value="lock" data-select="1">
-						<i class="fa-solid fa-eye"></i>
-						<span class="tooltip-text">
-							<p>
-								Lock camera to a specular view
-							</p>
-							<p>
-								Disabled when selecting 2D Graph
-							</p>
-						</span>
-					</button>
+				<div class="content">
+					<div class="option-btns" style="margin-top: 5px;">
+						<button class="option-btn" data-ops-category="cameraMovement"  data-ops-value="free" data-select="0">
+							<i class="fa-solid fa-person-running"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Free to move around the scene</b>
+								</p>
+								<p>
+									Disabled when selecting 2D Graph or WebGL is unavailable
+								</p>
+							</span>
+						</button>
+						<button class="option-btn" data-ops-category="cameraMovement"  data-ops-value="lock" data-select="1">
+							<i class="fa-solid fa-eye"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Lock camera to a specular view</b>
+								</p>
+								<p>
+									Disabled when selecting 2D Graph or WebGL is unavailable
+								</p>
+							</span>
+						</button>
+					</div>
 				</div>
 			</div>
 			<div class="controller">
@@ -104,25 +111,37 @@
 					</span>
 				</span>
 
-				<div class="option-btns" style="margin-top: 5px;">
-					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-2d" data-select="0">
-						<i class="fa-solid fa-signal"></i>
-						<span class="tooltip-text">
-							2D Graph
-						</span>
-					</button>
-					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="0">
-						<i class="fa-solid fa-grip"></i>
-						<span class="tooltip-text">
-							3D Marching Cube - Point Grid
-						</span>
-					</button>
-					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d" data-select="1">
-						<i class="fa-solid fa-cubes"></i>
-						<span class="tooltip-text">
-							3D Marching Cube
-						</span>
-					</button>
+				<div class="content">
+					<div class="option-btns" style="margin-top: 5px;">
+						<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-2d" data-select="0">
+							<i class="fa-solid fa-signal"></i>
+							<span class="tooltip-text">
+								2D Graph
+							</span>
+						</button>
+						<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="0">
+							<i class="fa-solid fa-grip"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>3D Marching Cube - Point Grid</b>
+								</p>
+								<p>
+									Disabled when WebGL is unavailable
+								</p>
+							</span>
+						</button>
+						<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d" data-select="1">
+							<i class="fa-solid fa-cubes"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>3D Marching Cube</b>
+								</p>
+								<p>
+									Disabled when WebGL is unavailable
+								</p>
+							</span>
+						</button>
+					</div>
 				</div>
 			</div>
 			<div class="controller">
@@ -132,12 +151,36 @@
 					</span>
 				</span>
 
-				<div class="debug-container" style="margin-top: 5px;">
+				<div class="content">
 					<div id="camera-pos">
 						x = 0 | y = 0 | z = 0
 					</div>
 					<div id="camera-rot">
 						rx = 0 | ry = 0 | rz = 0
+					</div>
+				</div>
+			</div>
+			<div class="controller">
+				<span>
+					<span class="title">
+						FPS
+					</span>
+				</span>
+
+				<div class="content">
+					<div>
+						<span id="fps-text">
+							0
+						</span>
+					</div>
+					<div>
+						<div class="app-checkbox" id="webworker-cb-container">
+							<label>
+								Web Worker
+								<input type="checkbox" id="use-web-worker-cb">
+								<span class="placement"></span>
+							</label>
+						</div>
 					</div>
 				</div>
 			</div>

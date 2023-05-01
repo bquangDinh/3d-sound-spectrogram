@@ -15,6 +15,8 @@ import { Camera } from "../camera";
 export class FFT3DPointGrid extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID
 
+	public readonly supportWebWorker = false
+
 	private shaderProgram: ShaderProgram | null = null
 
 	private keysMap: Record<string, boolean> = {}
@@ -173,6 +175,8 @@ export class FFT3DPointGrid extends Renderer {
 	}
 
 	public render(dt: number): void {
+		if (!this.isWebGLSupported) return
+
 		if (!this.camera) {
 			throw new Error('You forgot to init camera for FFT3D')
 		}

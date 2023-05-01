@@ -6,7 +6,7 @@ import { FFT3D } from "./renderers/fft-3d";
 import { FFT3DPointGrid } from "./renderers/fft-3d-point-grid";
 import { Renderer } from "./renderers/renderer";
 
-export type GraphOptions = 'source' | 'cameraMovement' | 'graph'
+export type GraphOptions = 'source' | 'cameraMovement' | 'graph' | 'webworker'
 
 export const GRAPH_OPS = {
 	FFT3D: 'fft-3d',
@@ -43,10 +43,11 @@ export class Graph {
 
 	private isMicrophoneConnected = false
 
-	private options: Record<GraphOptions, string> = {
+	private options: Record<GraphOptions, string | boolean> = {
 		source: 'mic',
 		cameraMovement: 'lock',
 		graph: '3d',
+		webworker: false,
 	}
 
 	/* Graph Renderers */
@@ -109,11 +110,13 @@ export class Graph {
 	// 	}
 	// }
 
-	public setOption (key: GraphOptions, value: string) {
+	public setOption (key: GraphOptions, value: string | boolean) {
 		this.options[key] = value
 	}
 
 	public run () {
+		const fpsText = document.getElementById(CONSTANTS.DOM_ELEMENTS.FPS_TEXT_ID)
+
 		/* Keep track of time */
 		let previousTime = 0
 
@@ -134,6 +137,10 @@ export class Graph {
 			this.update(deltaTime)
 
 			this.render(deltaTime)
+
+			if (fpsText) {
+				fpsText.innerText = `${Math.floor(1 / deltaTime)}`
+			}
 
 			requestAnimationFrame(draw)
 		}
@@ -210,18 +217,20 @@ export class Graph {
 		}
 
 		// Set camera options
-		if (!this.activeRenderer.camera) {
-			return
+		if (this.activeRenderer.camera) {
+			switch (this.options.cameraMovement) {
+				case CAMERA_MOVEMENT_OPS.FREE:
+
+					this.activeRenderer.camera.unlockCamera()
+					break
+				case CAMERA_MOVEMENT_OPS.LOCK:
+				default:
+					this.activeRenderer.camera.lockCamera()
+			}
 		}
 
-		switch (this.options.cameraMovement) {
-			case CAMERA_MOVEMENT_OPS.FREE:
-				this.activeRenderer.camera.unlockCamera()
-				break
-			case CAMERA_MOVEMENT_OPS.LOCK:
-			default:
-				this.activeRenderer.camera.lockCamera()
-		}
+		// Set use web worker option
+		this.activeRenderer.setWebWorker(this.options.webworker as boolean)
 	}
 
 	/* Source Functions */

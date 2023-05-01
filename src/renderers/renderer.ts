@@ -9,6 +9,10 @@ export abstract class Renderer {
 
 	protected isWebGLSupported = false
 
+	public abstract readonly supportWebWorker: boolean
+
+	protected useWebWorker = false
+
 	protected gl: WebGL2RenderingContext | null = null
 
 	protected ctx: CanvasRenderingContext2D | null = null
@@ -49,6 +53,22 @@ export abstract class Renderer {
 			default:
 				console.log(`Renderer [${this.rendererName}]`, data)
 		}
+	}
+
+	public setWebWorker (value: boolean) {
+		if (!this.supportWebWorker) return
+
+		if (value === this.useWebWorker) {
+			// already set
+			return
+		}
+
+		this.useWebWorker = value
+
+		this.clear()
+
+		// Init with web worker option changed
+		this.init()
 	}
 
 	public existPointerLockMode () {
