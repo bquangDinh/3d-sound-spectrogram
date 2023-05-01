@@ -36,6 +36,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 			// mark this option as selected
 			target.dataset['select'] = "1"
 
+			// special cases
+			if (category === 'graph' && value === 'fft-2d') {
+				// Disable camera movement
+				document.querySelectorAll(".option-btn[data-ops-category='cameraMovement']").forEach((el) => {
+					el.classList.add('disabled')
+					el.setAttribute('disabled', 'disabled')
+				})
+			} else {
+				// Enable camera movement
+				document.querySelectorAll(".option-btn[data-ops-category='cameraMovement']").forEach((el) => {
+					el.classList.remove('disabled')
+					el.removeAttribute('disabled')
+				})
+			}
+
 			// save option to graph
 			graph.setOption(category, value)
 		})

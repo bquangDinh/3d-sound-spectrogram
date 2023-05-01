@@ -1,5 +1,5 @@
 import { fft, Phasors } from "fft-js"
-import { vec3 } from "gl-matrix"
+import { vec2, vec3, vec4 } from "gl-matrix"
 
 export interface IAudioBufferOptions {
 	channel?: number
@@ -46,6 +46,80 @@ export const NumberUtils = {
 	},
 	getIndexFromXYZ: (x: number, y: number, z: number, dims: vec3) => {
 		return x + dims[0] * (y + dims[1] * z)
+	},
+	// Same function as min in GLSL
+	mix: (a: number | vec2 | vec3 | vec4, b: number | vec2 | vec3 | vec4, value: number) => {
+		const interpolate = (a: number, b: number, v: number) => {
+			// https://registry.khronos.org/OpenGL-Refpages/gl4/html/mix.xhtml
+			return a * (1 - v) + b * a
+		}
+
+		if (typeof a !== typeof b) {
+			throw new Error('type a must be the same as type b')
+		}
+
+		if (typeof a === 'number' && typeof b == 'number') {
+			// mix two numbers
+			return interpolate(a, b, value)
+		}
+
+		if (Array.isArray(a) && Array.isArray(b)) {
+			const la = a.length
+			const lb = b.length
+
+			if (la === 2 && lb === 2) {
+				// vec2
+				return vec2.fromValues(
+					interpolate(a[0], b[0], value),
+					interpolate(a[1], b[1], value),
+				)
+			}
+
+			if (la === 3 && lb === 3) {
+				// vec3
+				return vec3.fromValues(
+					interpolate(a[0], b[0], value),
+					interpolate(a[1], b[1], value),
+					interpolate(a[2], b[2], value),
+				)
+			}
+
+			if (la === 4 && lb === 4) {
+				// vec4
+				return vec4.fromValues(
+					interpolate(a[0], b[0], value),
+					interpolate(a[1], b[1], value),
+					interpolate(a[2], b[2], value),
+					interpolate(a[3], b[3], value),
+				)
+			}
+		}
+
+		throw new Error('Invalid mix arguments!')
+	},
+}
+
+export const ColorUtils = {
+	interpolateColorByHeight: (height: number, maxHeight: number) => {
+		const percentage = height / maxHeight
+
+		if (percentage > 1 || percentage < 0) {
+			throw new Error('Invalid height value or max height value for interpolate color')
+		}
+
+		let color: vec3
+
+		if (percentage <= 0.4) {
+			color = NumberUtils.mix([1, 0, 0], [1, 0, 1], percentage) as vec3
+		} else if (percentage <= 0.6) {
+			color = NumberUtils.mix([1, 0, 1], [0, 0, 1], (0.6 - percentage) / 0.2) as vec3
+		} else if (percentage <= 0.8) {
+			color = NumberUtils.mix([0, 0, 1], [0, 1, 1], (0.8 - percentage) / 0.2) as vec3
+		} else {
+			color = NumberUtils.mix([0, 1, 1], [0, 1, 0], (1 - percentage) / 0.2) as vec3
+		}
+
+		return color
 	}
 }
 

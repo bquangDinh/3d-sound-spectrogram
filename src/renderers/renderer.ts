@@ -1,7 +1,9 @@
-export abstract class Renderer {
-	protected abstract rendererName: string
+import { Camera } from "../camera"
 
-	protected dataSource: Uint8Array
+export abstract class Renderer {
+	protected abstract _rendererName: string
+
+	protected dataSource: Uint8Array | null = null
 
 	protected _isInitialized = false
 
@@ -11,9 +13,9 @@ export abstract class Renderer {
 
 	protected ctx: CanvasRenderingContext2D | null = null
 
-	constructor(protected canvas: HTMLCanvasElement) {
-		this.dataSource = new Uint8Array()
+	public camera: Camera | null = null
 
+	constructor(protected canvas: HTMLCanvasElement) {
 		// Attempt to use WebGL2 context
 		this.gl = this.canvas.getContext('webgl2')
 
@@ -26,11 +28,15 @@ export abstract class Renderer {
 		return this._isInitialized
 	}
 
+	get rendererName () {
+		return this._rendererName
+	}
+
 	public abstract init(): void
 
 	public abstract render (dt: number): void
 
-	public abstract connectDataSource (data: Uint8Array): void
+	public abstract update (dt: number): void
 
 	protected log (type: 'log' | 'warn' | 'error' = 'log', ...data: any[]) {
 		switch (type) {
@@ -42,6 +48,32 @@ export abstract class Renderer {
 			case 'log':
 			default:
 				console.log(`Renderer [${this.rendererName}]`, data)
+		}
+	}
+
+	public clear () {
+		this._isInitialized = false
+	}
+
+	public connectDataSource(data: Uint8Array): void {
+		this.dataSource = data
+	}
+
+	public disconnectDataSource(): void {
+		this.dataSource = null
+	}
+
+	// Detech changes in canvas size and change canvas size accordingly
+	// Only call when WebGL is supported
+	protected resizeCanvasToDisplaySize () {
+		if (this.gl) {
+			const width = (this.gl.canvas as HTMLCanvasElement).clientWidth
+			const height = (this.gl.canvas as HTMLCanvasElement).clientHeight
+
+			if (this.gl.canvas.width !== width || this.gl.canvas.height !== height) {
+				this.gl.canvas.width = width
+				this.gl.canvas.height = height
+			}
 		}
 	}
 }

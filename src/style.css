@@ -185,9 +185,13 @@ h1 {
 	transition: all .3s;
 }
 
+.option-btns .option-btn.disabled {
+	background-color: #646464 !important;
+	cursor: not-allowed;
+}
+
 .option-btns .option-btn[data-select="1"] {
 	opacity: 1;
-
 }
 
 .option-btns .option-btn .tooltip-text {
@@ -218,7 +222,7 @@ h1 {
 	border-color: #ededed transparent transparent transparent;
   }
 
-.option-btns .option-btn:hover {
+.option-btns .option-btn:not(.disabled):hover {
 	background-color: #ededed;
 	opacity: 1;
 }

@@ -7,9 +7,15 @@ export class Camera {
 
 	private readonly PITCH_LIMIT = 89.0
 
+	private readonly SPECULAR_POS: vec3 = [-23, 84, 47]
+
+	private readonly SPECULAR_ROT: vec3 = [0.7, -0.7, 0]
+
 	private pitch = 0.0 // up and down
 
 	private yaw = -90.0 // left and right
+
+	private isLocked = true
 
 	public cameraPos: vec3 = [-23, 84, 47] // an arbitrary position so I can see things better
 
@@ -17,7 +23,9 @@ export class Camera {
 
 	private cameraUp: vec3 = [0, 1, 0]
 
-	private positionText: HTMLSpanElement | null = null
+	public positionText: HTMLSpanElement | null = null
+
+	public rotationText: HTMLSpanElement | null = null
 
 	constructor() {
 		this.positionText = document.getElementById('cam-position')
@@ -27,11 +35,19 @@ export class Camera {
 
 	private updatePositionText () {
 		if (this.positionText) {
-			this.positionText.innerHTML = `X = ${this.cameraPos[0]} | Y = ${this.cameraPos[1]} | Z = ${this.cameraPos[2]} | frX = ${this.cameraFront[0]} | frY = ${this.cameraFront[1]} | frZ = ${this.cameraFront[2]}`
+			this.positionText.innerHTML = `x = ${this.cameraPos[0].toFixed(2)} | y = ${this.cameraPos[1].toFixed(2)} | z = ${this.cameraPos[2].toFixed(2)}`
+		}
+	}
+
+	private updateRotationText () {
+		if (this.rotationText) {
+			this.rotationText.innerHTML = `rx = ${this.cameraFront[0].toFixed(2)} | ry = ${this.cameraFront[1].toFixed(2)} | rz = ${this.cameraFront[2].toFixed(2)}`
 		}
 	}
 
 	public turnAround(offsetX: number, offsetY: number) {
+		if (this.isLocked) return
+
 		// Control the speed of turning around by sensitivity
 		offsetX *= this.SENSITIVITY
 		offsetY *= this.SENSITIVITY
@@ -59,9 +75,13 @@ export class Camera {
 		cameraFrontVector[2] = Math.sin(yawRad) * Math.cos(pitchRad)
 
 		vec3.normalize(this.cameraFront, cameraFrontVector)
+
+		this.updateRotationText()
 	}
 
 	public moveForward(dt: number) {
+		if (this.isLocked) return
+
 		const speed = this.CAMERA_SPEED * dt
 
 		const scaledCameraFront: vec3 = [0, 0, 0]
@@ -74,6 +94,8 @@ export class Camera {
 	}
 
 	public moveBackward(dt: number) {
+		if (this.isLocked) return
+
 		const speed = this.CAMERA_SPEED * dt
 
 		const scaledCameraFront: vec3 = [0, 0, 0]
@@ -86,6 +108,8 @@ export class Camera {
 	}
 
 	public turnLeft(dt: number) {
+		if (this.isLocked) return
+
 		const speed = this.CAMERA_SPEED * dt
 
 		const cameraRight: vec3 = [0, 0, 0]
@@ -102,6 +126,8 @@ export class Camera {
 	}
 
 	public turnRight(dt: number) {
+		if (this.isLocked) return
+
 		const speed = this.CAMERA_SPEED * dt
 
 		const cameraRight: vec3 = [0, 0, 0]
@@ -127,5 +153,19 @@ export class Camera {
 		mat4.lookAt(view, this.cameraPos, center, this.cameraUp)
 
 		return view
+	}
+
+	public lockCamera () {
+		if (!this.isLocked) {
+			this.isLocked = true
+
+			this.cameraPos = this.SPECULAR_POS
+
+			this.cameraFront = this.SPECULAR_ROT
+		}
+	}
+
+	public unlockCamera () {
+		this.isLocked = false
 	}
 }

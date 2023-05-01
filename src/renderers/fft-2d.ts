@@ -3,11 +3,12 @@ import { CONSTANTS } from "../constants";
 /* WebGL */
 import { Shader } from "../webgl/shader";
 import { ShaderProgram } from "../webgl/shader-program";
-
 import { Renderer } from "./renderer";
 
+import { max } from "lodash";
+
 export class FFT2D extends Renderer {
-	protected rendererName = 'FFT2D'
+	protected _rendererName = CONSTANTS.RENDERERS.NAMES.FFT2D
 
 	private shaderProgram: ShaderProgram | null = null
 
@@ -33,20 +34,21 @@ export class FFT2D extends Renderer {
 			return
 		}
 
-		const gl = this.gl
-
-		if (gl) {
+		if (this.isWebGLSupported) {
 			this.initWebGL()
 		}
 
 		this._isInitialized = true
+
+		this.log('log', 'Initialized')
 	}
 
 	private initWebGL () {
 		const gl = this.gl
 
 		if (!gl) {
-			throw new Error('No WebGL2Context found')
+			this.log('error', 'No WebGL2 Rendering Context found! Your browser may not support WebGL2')
+			return
 		}
 
 		// Set WebGL Viewport
@@ -95,18 +97,49 @@ export class FFT2D extends Renderer {
 
 		// Unbind VAO
 		gl.bindVertexArray(null)
+
+		// Disable DEPTH_TEST
+		// Since this is 2D
+		gl.disable(gl.DEPTH_TEST);
+	}
+
+	public update(_: number): void {
+		// nothing here to update
 	}
 
 	public render(dt: number): void {
 		if (!this.isInitialized) {
-			throw new Error(`[${this.rendererName}] Renderer is not yet initialized!`)
+			return
 		}
 
 		if (this.isWebGLSupported) {
+			this.resizeCanvasToDisplaySize()
 			this.renderUsingWebGL(dt)
 		} else {
 			this.renderUsingCanvas(dt)
 		}
+	}
+
+	public clear(): void {
+		this.vertices = []
+
+		this.indices = []
+
+		if (this.shaderProgram) {
+			this.shaderProgram.deleteProgram()
+		}
+
+		this.uniformSetters = {}
+
+		this.positionAttributeLocation = -1
+
+		this.VAO = null
+
+		this.verticesBuffer = null
+
+		this.indicesBuffer = null
+
+		super.clear()
 	}
 
 	private renderUsingWebGL (_: number) {
@@ -117,6 +150,11 @@ export class FFT2D extends Renderer {
 
 		if (!this.shaderProgram) {
 			throw new Error(`[${this.rendererName}] Shader Program is null. You maybe forger to create it`)
+		}
+
+		if (!this.dataSource) {
+			// no datasource
+			return
 		}
 
 		const gl = this.gl
@@ -132,6 +170,8 @@ export class FFT2D extends Renderer {
 
 		const DELTAX = gl.canvas.width / numData
 
+		const MAX = (max(dataSource) ?? 0)
+
 		// Start drawing from the bottom-left corner of the canvas
 		let lastX = 0, lastY = 0
 
@@ -141,11 +181,13 @@ export class FFT2D extends Renderer {
 
 		// indices should be added here but there is a bug which make this doesn't work
 		// I have no idea
-
 		for (let i = 0; i < numData; ++i) {
 			y = dataSource[i]
 
-			this.vertices.push(lastX + DELTAX, y)
+			this.vertices.push(
+				// x y
+				lastX + DELTAX, y,
+			)
 
 			this.indices.push(i, i + 1)
 
@@ -194,6 +236,11 @@ export class FFT2D extends Renderer {
 
 		this.shaderProgram.use()
 
+		// Set uniform
+		this.shaderProgram.setUniforms(this.uniformSetters, {
+			'maxHeight': MAX
+		})
+
 		gl.bindVertexArray(this.VAO)
 
 		gl.drawElements(gl.LINES, this.indices.length, gl.UNSIGNED_SHORT, 0)
@@ -212,6 +259,11 @@ export class FFT2D extends Renderer {
 	private renderUsingCanvas (_: number) {
 		if (!this.ctx) {
 			this.log('error', 'Your browser may not support Canvas 2D Rendering Context')
+			return
+		}
+
+		if (!this.dataSource) {
+			// no datasource
 			return
 		}
 
@@ -246,9 +298,5 @@ export class FFT2D extends Renderer {
 
 			x += barWidth + 1;
 		}
-	}
-
-	public connectDataSource(data: Uint8Array): void {
-		this.dataSource = data
 	}
 }
