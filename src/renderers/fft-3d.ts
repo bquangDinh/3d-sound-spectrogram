@@ -3,7 +3,7 @@ import { EdgeVertexIndices, TriangleTable } from "../lookup-table";
 import { CONSTANTS } from "../constants";
 
 /* Utils */
-import { max } from "lodash";
+import { max, min } from "lodash";
 import { NumberUtils } from "../utils";
 import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 
@@ -12,6 +12,9 @@ import { Shader } from "../webgl/shader";
 import { ShaderProgram } from "../webgl/shader-program";
 import { Renderer } from "./renderer";
 import { Camera } from "../camera";
+
+/* Worker */
+import Worker from '../workers/fft-3d.worker?worker'
 
 export class FFT3D extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT3D
@@ -34,6 +37,18 @@ export class FFT3D extends Renderer {
 	/* Buffer Data */
 	private vertices: number[] = []
 
+	/* Double Buffering */
+	/* Only use when using Worker */
+	private v1: number[] = []
+
+	private v2: number[] = []
+
+	// Current active buffer index
+	private activeBuffer = 1
+
+	// Flag to check whether it should send the data to the worker for the first time
+	private initSendingBuffer = false
+
 	/* FFT data */
 	private ffts: Uint8Array[] = []
 
@@ -50,6 +65,17 @@ export class FFT3D extends Renderer {
 	// x, y, z are point coordinate in marching cube's grid
 	// d is the point's density value
 	private data: vec4[] = []
+
+	/* Workers */
+	worker: Worker | null = null
+
+	public maxX = Number.NEGATIVE_INFINITY
+
+	public minX = Number.POSITIVE_INFINITY
+
+	public maxZ = Number.NEGATIVE_INFINITY
+
+	public minZ = Number.POSITIVE_INFINITY
 
 	public init(): void {
 		if (this.isInitialized) {
@@ -72,6 +98,8 @@ export class FFT3D extends Renderer {
 		this.initData()
 
 		this.initEvents()
+
+		this.initWorker()
 
 		this._isInitialized = true
 
@@ -184,6 +212,21 @@ export class FFT3D extends Renderer {
 		this.canvas.addEventListener('click', this.onCanvasClick.bind(this))
 	}
 
+	private initWorker () {
+		// Check if browser support web worker
+		if (window.Worker) {
+			this.worker = new Worker()
+
+			this.worker.onmessage = (ev: MessageEvent<any>) => {
+				this.receiveDataFromWorker(ev.data)
+			}
+
+			this.log('log', 'Created worker')
+		} else {
+			this.log('warn', 'Web browser does not support Web Worker')
+		}
+	}
+
 	public render(dt: number): void {
 		if (!this.camera) {
 			throw new Error('You forgot to init camera for FFT3D')
@@ -212,7 +255,19 @@ export class FFT3D extends Renderer {
 		if (this.isInitialized) {
 			this.updateFFT()
 
-			this.updateData()
+			// Using worker
+			if (this.worker) {
+				// transfer new data to workers
+				if (!this.initSendingBuffer) {
+					// If this is the first time to send data to the worker
+					this.transferDataToWorker(1)
+					this.initSendingBuffer = true
+				}
+			} else {
+				// Not using worker
+				// update data as normal
+				this.updateData()
+			}
 
 			this.processKeyInput(dt)
 		}
@@ -225,6 +280,8 @@ export class FFT3D extends Renderer {
 
 		this.clearEvents()
 
+		this.clearWorker()
+
 		super.clear()
 	}
 
@@ -232,6 +289,8 @@ export class FFT3D extends Renderer {
 		this.ffts = []
 		this.vertices = []
 		this.data = []
+		this.v1 = []
+		this.v2 = []
 	}
 
 	private clearWebGL () {
@@ -275,6 +334,14 @@ export class FFT3D extends Renderer {
 		this.canvas.removeEventListener('click', this.onCanvasClick)
 	}
 
+	private clearWorker() {
+		if (this.worker) {
+			this.worker.terminate()
+			this.initSendingBuffer = false
+			this.worker = null
+		}
+	}
+
 	private renderMarchingCubes(_: number) {
 		const gl = this.gl
 
@@ -288,11 +355,29 @@ export class FFT3D extends Renderer {
 
 		this.shaderProgram.use()
 
-		// Clear old buffer data
-		this.vertices = []
+		if (!this.worker) {
+			this.vertices = []
 
-		// Triangulate based on vertices FFT data
-		this.triangulate()
+			this.minX = Number.POSITIVE_INFINITY
+
+			this.maxX = Number.NEGATIVE_INFINITY
+
+			this.minZ = Number.POSITIVE_INFINITY
+
+			this.maxZ = Number.NEGATIVE_INFINITY
+
+			// Triangulate based on vertices FFT data
+			this.triangulate()
+		} else {
+			// Triangulate logic already been handled from the worker
+			// Just need to wait for data
+			// Clear old buffer data
+			if (this.activeBuffer === 1) {
+				this.vertices = this.v1
+			} else {
+				this.vertices = this.v2
+			}
+		}
 
 		// Use VAO
 		gl.bindVertexArray(this.VAO)
@@ -343,6 +428,8 @@ export class FFT3D extends Renderer {
 		gl.bindBuffer(gl.ARRAY_BUFFER, null)
 
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+
+		// console.log(`minx: ${this.minX} | minz: ${this.minZ} | maxx: ${this.maxX} | maxz: ${this.maxZ}`)
 	}
 
 	private triangulate () {
@@ -456,6 +543,14 @@ export class FFT3D extends Renderer {
 
 		const normal = vec3.cross(vec3.create(), p12, p13)
 
+		this.minX = min([this.minX, p1[0], p2[0], p3[0]]) ?? Number.POSITIVE_INFINITY
+
+		this.maxX = max([this.maxX, p1[0], p2[0], p3[0]]) ?? Number.NEGATIVE_INFINITY
+
+		this.minZ = min([this.minZ, p1[2], p2[2], p3[2]]) ?? Number.POSITIVE_INFINITY
+
+		this.maxZ = max([this.maxZ, p1[2], p2[2], p3[2]]) ?? Number.NEGATIVE_INFINITY
+
 		this.vertices.push(
 			p1[0], p1[1], p1[2], normal[0], normal[1], normal[2],
 			p2[0], p2[1], p2[2], normal[0], normal[1], normal[2],
@@ -465,6 +560,12 @@ export class FFT3D extends Renderer {
 
 	private updateFFT () {
 		if (!this.dataSource) {
+			return
+		}
+
+		// Using worker
+		// no need to update ffts array since data is already been sent to the worker
+		if (this.worker) {
 			return
 		}
 
@@ -548,6 +649,79 @@ export class FFT3D extends Renderer {
 				}
 			}
 		}
+	}
+
+	private transferDataToWorker (bufferIndex: number) {
+		if (!this.worker) {
+			throw new Error('Worker has not been initialized!')
+		}
+
+		if (!this.dataSource || this.dataSource.length === 0) return
+
+		// Pass data source buffer data to worker as a transferable object
+		// clone fft array
+		const clone = new Uint8Array(this.dataSource.length)
+
+		clone.set(this.dataSource)
+
+		this.worker.postMessage({
+			type: CONSTANTS.WORKER.SOURCE_FROM_MAIN_THREAD,
+			data: clone.buffer,
+			bufferIndex
+		}, [clone.buffer])
+	}
+
+	private receiveDataFromWorker (msg: any) {
+		const { type, data, bufferIndex } = msg
+
+		if (!type || !data) {
+			throw new Error('Invalid data transfered to main thread')
+		}
+
+		if (type === CONSTANTS.WORKER.RESULT_FROM_WORKER) {
+			if (!(data instanceof ArrayBuffer) || typeof bufferIndex !== 'number') {
+				throw new Error('Invalid data transfered to main thread')
+			}
+
+			// Send the current active buffer to web worker for processing
+			this.transferDataToWorker(this.activeBuffer)
+
+			if (bufferIndex === 1) {
+				// Buffer 1 data is processed
+				// Save to the opposite buffer
+				this.v2 = this.writeBufferToVertices(data)
+
+				// Make buffer 2 as active
+				this.activeBuffer = 2
+			} else {
+				// Buffer 2 data is processed
+				// Save to the opposite buffer
+				this.v1 = this.writeBufferToVertices(data)
+
+				// Make buffer 1 as active
+				this.activeBuffer = 1
+			}
+		}
+	}
+
+	private writeBufferToVertices (buffer: ArrayBuffer) {
+		// make sure the vertices data is clear
+		const vertices = []
+
+		const dataView = new DataView(buffer)
+
+		// Float32 is 4 bytes each
+		const length = dataView.byteLength / 4
+
+		let value: number
+
+		for (let i = 0; i < length; ++i) {
+			value = dataView.getFloat32(i * 4)
+
+			vertices.push(value)
+		}
+
+		return vertices
 	}
 
 	/**

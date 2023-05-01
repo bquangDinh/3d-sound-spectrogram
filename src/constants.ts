@@ -35,5 +35,9 @@ export const CONSTANTS = {
 			SPECULAR_POS: vec3.fromValues(-57, 7, -46),
 			SPECULAR_ROT: vec3.fromValues(0.75, 0.2, 0.64)
 		}
+	},
+	WORKER: {
+		SOURCE_FROM_MAIN_THREAD: '0',
+		RESULT_FROM_WORKER: '1',
 	}
 }
