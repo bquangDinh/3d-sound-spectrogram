@@ -1,4 +1,4 @@
-import { Camera } from "../camera"
+import { Camera } from "../webgl/camera"
 
 export abstract class Renderer {
 	protected abstract _rendererName: string

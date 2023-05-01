@@ -1,6 +1,6 @@
 import { fft, Phasors } from "fft-js"
 import { vec2, vec3, vec4 } from "gl-matrix"
-import { CONSTANTS } from "./constants"
+import { CONSTANTS } from "../constants/constants"
 
 export interface IAudioBufferOptions {
 	channel?: number

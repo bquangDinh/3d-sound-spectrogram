@@ -1,12 +1,12 @@
-import { Camera } from "./camera";
+import { Camera } from "./webgl/camera";
 
 /* Constants */
-import { CONSTANTS } from "./constants";
-import { EdgeVertexIndices, TriangleTable } from "./lookup-table";
+import { CONSTANTS } from "./constants/constants";
+import { EdgeVertexIndices, TriangleTable } from "./constants/lookup-table";
 
 /* Utils */
 import { max } from "lodash";
-import { NumberUtils } from "./utils";
+import { NumberUtils } from "./utils/utils";
 import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 
 /* WebGL */

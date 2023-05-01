@@ -1,4 +1,4 @@
-import { CONSTANTS } from "./constants";
+import { CONSTANTS } from "./constants/constants";
 
 /* Renderers */
 import { FFT2D } from "./renderers/fft-2d";

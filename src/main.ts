@@ -2,9 +2,9 @@ import './style.scss'
 
 import { Graph, GraphOptions } from './graph'
 
-import { UIUtils } from './utils'
+import { UIUtils } from './utils/utils'
 
-import { CONSTANTS } from './constants'
+import { CONSTANTS } from './constants/constants'
 
 document.addEventListener('DOMContentLoaded', async () => {
 	const graph = new Graph(CONSTANTS.DOM_ELEMENTS.CANVAS_ID, CONSTANTS.DOM_ELEMENTS.CANVAS_CONTAINER_ID)

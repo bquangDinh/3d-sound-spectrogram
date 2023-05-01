@@ -1,16 +1,16 @@
 /* Constants */
-import { CONSTANTS } from "../constants";
+import { CONSTANTS } from "../constants/constants";
 
 /* Utils */
 import { max } from "lodash";
-import { NumberUtils } from "../utils";
+import { NumberUtils } from "../utils/utils";
 import { glMatrix, mat4, vec3 } from "gl-matrix";
 
 /* WebGL */
 import { Shader } from "../webgl/shader";
 import { ShaderProgram } from "../webgl/shader-program";
 import { Renderer } from "./renderer";
-import { Camera } from "../camera";
+import { Camera } from "../webgl/camera";
 
 export class FFT3DPointGrid extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID

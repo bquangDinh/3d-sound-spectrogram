@@ -1,4 +1,4 @@
-import { CONSTANTS } from "../constants";
+import { CONSTANTS } from "../constants/constants";
 
 /* WebGL */
 import { Shader } from "../webgl/shader";

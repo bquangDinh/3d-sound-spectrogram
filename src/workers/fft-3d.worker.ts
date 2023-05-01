@@ -1,8 +1,8 @@
 import { vec3, vec4 } from "gl-matrix"
-import { CONSTANTS } from "../constants"
+import { CONSTANTS } from "../constants/constants"
 import { max, min } from "lodash"
-import { NumberUtils } from "../utils"
-import { EdgeVertexIndices, TriangleTable } from "../lookup-table"
+import { NumberUtils } from "../utils/utils"
+import { EdgeVertexIndices, TriangleTable } from "../constants/lookup-table"
 
 class TriangulateFFT {
 	ffts: Uint8Array[] = []

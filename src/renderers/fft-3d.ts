@@ -1,17 +1,17 @@
 /* Constants */
-import { EdgeVertexIndices, TriangleTable } from "../lookup-table";
-import { CONSTANTS } from "../constants";
+import { EdgeVertexIndices, TriangleTable } from "../constants/lookup-table";
+import { CONSTANTS } from "../constants/constants";
 
 /* Utils */
 import { max, min } from "lodash";
-import { NumberUtils } from "../utils";
+import { NumberUtils } from "../utils/utils";
 import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 
 /* WebGL */
 import { Shader } from "../webgl/shader";
 import { ShaderProgram } from "../webgl/shader-program";
 import { Renderer } from "./renderer";
-import { Camera } from "../camera";
+import { Camera } from "../webgl/camera";
 
 /* Worker */
 import Worker from '../workers/fft-3d.worker?worker'
