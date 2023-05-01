@@ -8,7 +8,7 @@ import { Renderer } from "./renderer";
 import { max } from "lodash";
 
 export class FFT2D extends Renderer {
-	protected _rendererName = CONSTANTS.RENDERERS.NAMES.FFT2D
+	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT2D
 
 	private shaderProgram: ShaderProgram | null = null
 
@@ -121,9 +121,29 @@ export class FFT2D extends Renderer {
 	}
 
 	public clear(): void {
+		this.clearData()
+
+		this.clearWebGL()
+
+		super.clear()
+	}
+
+	private clearData () {
 		this.vertices = []
 
 		this.indices = []
+	}
+
+	private clearWebGL () {
+		const gl = this.gl
+
+		if (gl) {
+			gl.bindVertexArray(this.VAO)
+
+			gl.deleteBuffer(this.verticesBuffer)
+			gl.deleteBuffer(this.indicesBuffer)
+			gl.deleteVertexArray(this.VAO)
+		}
 
 		if (this.shaderProgram) {
 			this.shaderProgram.deleteProgram()
@@ -138,8 +158,6 @@ export class FFT2D extends Renderer {
 		this.verticesBuffer = null
 
 		this.indicesBuffer = null
-
-		super.clear()
 	}
 
 	private renderUsingWebGL (_: number) {

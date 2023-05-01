@@ -51,6 +51,12 @@ export abstract class Renderer {
 		}
 	}
 
+	public existPointerLockMode () {
+		if (document.pointerLockElement) {
+			document.exitPointerLock()
+		}
+	}
+
 	public clear () {
 		this._isInitialized = false
 	}

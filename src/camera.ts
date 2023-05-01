@@ -7,9 +7,9 @@ export class Camera {
 
 	private readonly PITCH_LIMIT = 89.0
 
-	private readonly SPECULAR_POS: vec3 = [-23, 84, 47]
+	public SPECULAR_POS: vec3 = vec3.create()
 
-	private readonly SPECULAR_ROT: vec3 = [0.7, -0.7, 0]
+	public SPECULAR_ROT: vec3 = vec3.create()
 
 	private pitch = 0.0 // up and down
 
@@ -17,9 +17,9 @@ export class Camera {
 
 	private isLocked = true
 
-	public cameraPos: vec3 = [-23, 84, 47] // an arbitrary position so I can see things better
+	public cameraPos: vec3 = vec3.create()
 
-	private cameraFront: vec3 = [0.7, -0.7, 0]
+	private cameraFront: vec3 = vec3.create()
 
 	private cameraUp: vec3 = [0, 1, 0]
 
@@ -27,10 +27,22 @@ export class Camera {
 
 	public rotationText: HTMLSpanElement | null = null
 
-	constructor() {
-		this.positionText = document.getElementById('cam-position')
+	constructor() {}
+
+	public setSpecular(pos: vec3, rot: vec3) {
+		this.SPECULAR_POS = pos
+
+		this.SPECULAR_ROT = rot
+	}
+
+	public moveCameraToSpecularLocation() {
+		this.cameraPos = this.SPECULAR_POS
+
+		this.cameraFront = this.SPECULAR_ROT
 
 		this.updatePositionText()
+
+		this.updateRotationText()
 	}
 
 	private updatePositionText () {
@@ -159,9 +171,7 @@ export class Camera {
 		if (!this.isLocked) {
 			this.isLocked = true
 
-			this.cameraPos = this.SPECULAR_POS
-
-			this.cameraFront = this.SPECULAR_ROT
+			this.moveCameraToSpecularLocation()
 		}
 	}
 

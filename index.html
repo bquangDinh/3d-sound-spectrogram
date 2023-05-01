@@ -111,16 +111,16 @@
 							2D Graph
 						</span>
 					</button>
-					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d" data-select="0">
-						<i class="fa-solid fa-cubes"></i>
-						<span class="tooltip-text">
-							3D Marching Cube
-						</span>
-					</button>
-					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="1">
+					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="0">
 						<i class="fa-solid fa-grip"></i>
 						<span class="tooltip-text">
 							3D Marching Cube - Point Grid
+						</span>
+					</button>
+					<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d" data-select="1">
+						<i class="fa-solid fa-cubes"></i>
+						<span class="tooltip-text">
+							3D Marching Cube
 						</span>
 					</button>
 				</div>
@@ -292,6 +292,45 @@
 
 		void main() {
 			outColor = vec4(interpolate(gl_FragCoord.y), 1.0f);
+		}
+	</script>
+
+	<!--FFT3D Point Grid SHADERS-->
+	<script type="x-shader/x-vertex" id="fft3d-pg-vertex-shader">
+		#version 300 es
+
+		in vec3 a_position;
+		in float a_density;
+
+		uniform mat4 model;
+		uniform mat4 view;
+		uniform mat4 projection;
+
+		out float v_density;
+
+		void main() {
+			gl_Position = projection * view * vec4(a_position, 1.0f);
+			gl_PointSize = 5.0f;
+
+			// Pass density value to fragment shader
+			v_density = a_density;
+		}
+	</script>
+	<script type="x-shader/x-fragment" id="fft3d-pg-fragment-shader">
+		#version 300 es
+
+		precision highp float;
+
+		in float v_density;
+
+		out vec4 outColor;
+
+		void main() {
+			if (v_density == 0.0f) {
+				outColor = vec4(0.0f, 0.0f, 1.0f, 1.0f);
+			} else {
+				outColor = vec4(1.0f, v_density, 0.09f, 1.0f);
+			}
 		}
 	</script>
 

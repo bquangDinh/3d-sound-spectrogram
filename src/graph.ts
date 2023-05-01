@@ -1,7 +1,9 @@
-/* Renderers */
 import { CONSTANTS } from "./constants";
+
+/* Renderers */
 import { FFT2D } from "./renderers/fft-2d";
 import { FFT3D } from "./renderers/fft-3d";
+import { FFT3DPointGrid } from "./renderers/fft-3d-point-grid";
 import { Renderer } from "./renderers/renderer";
 
 export type GraphOptions = 'source' | 'cameraMovement' | 'graph'
@@ -70,7 +72,8 @@ export class Graph {
 
 		this.renderers = {
 			[CONSTANTS.RENDERERS.NAMES.FFT2D]: new FFT2D(this.canvas),
-			[CONSTANTS.RENDERERS.NAMES.FFT3D]: new FFT3D(this.canvas)
+			[CONSTANTS.RENDERERS.NAMES.FFT3D]: new FFT3D(this.canvas),
+			[CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID]: new FFT3DPointGrid(this.canvas)
 		}
 	}
 
@@ -99,12 +102,12 @@ export class Graph {
 		this.dataArray = new Uint8Array(analyser.frequencyBinCount)
 	}
 
-	private async initRenderers () {
-		for (const key of Object.keys(this.renderers)) {
-			this.renderers[key].init()
-			this.renderers[key].connectDataSource(this.dataArray)
-		}
-	}
+	// private async initRenderers () {
+	// 	for (const key of Object.keys(this.renderers)) {
+	// 		this.renderers[key].init()
+	// 		this.renderers[key].connectDataSource(this.dataArray)
+	// 	}
+	// }
 
 	public setOption (key: GraphOptions, value: string) {
 		this.options[key] = value
@@ -173,6 +176,9 @@ export class Graph {
 			case GRAPH_OPS.FFT2D:
 				renderName = CONSTANTS.RENDERERS.NAMES.FFT2D
 				break
+			case GRAPH_OPS.FFT3D_POINTGRID:
+				renderName = CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID
+				break
 			case GRAPH_OPS.FFT3D:
 			default:
 				renderName = CONSTANTS.RENDERERS.NAMES.FFT3D
@@ -188,6 +194,7 @@ export class Graph {
 			for (const key of Object.keys(this.renderers)) {
 				if (key !== renderName) {
 					this.renderers[key].clear()
+					this.renderers[key].existPointerLockMode()
 				}
 			}
 		} else if (!this.activeRenderer) {
