@@ -1,26 +1,46 @@
 import './style.css'
 
-import { Graph } from './graph'
+import { Graph, GraphOptions } from './graph'
 
-// export async function onReadFile (e: Event) {
-// 	// Retrieve the input file target
-// 	const inputFile = e.target as HTMLInputElement
+import { UIUtils } from './utils'
 
-// 	if (inputFile.files) {
-// 		const graph = new Graph('spectrogram-canvas', 'canvas-container')
+document.addEventListener('DOMContentLoaded', async () => {
+	const graph = new Graph('spectrogram-canvas', 'canvas-container')
 
-// 		graph.fromFile(inputFile.files[0])
-// 	}
-// }
+	await graph.init()
 
-// const audioBtn = document.getElementById('read-audio-file')
+	UIUtils.generateSelect('app-select', (val) => {
+		console.log('Selected', val)
+	})
 
-// if (!audioBtn) {
-// 	throw new Error('Audio Input cannot be found!')
-// }
+	const optionBtns = document.getElementsByClassName('option-btn')
 
-// audioBtn.addEventListener('change', onReadFile, false);
+	for (let i = 0; i < optionBtns.length; ++i) {
+		optionBtns[i].addEventListener('click', (e) => {
+			// https://salesforce.stackexchange.com/questions/397178/lwc-event-target-dataset-sometimes-empty-sometimes-not
+			const target = e.currentTarget as HTMLElement
 
-const graph = new Graph('spectrogram-canvas', 'canvas-container')
+			const category = target.dataset.opsCategory as GraphOptions
 
-graph.testMarchingCubes()
+			const value = target.dataset.opsValue
+
+			if (!value) {
+				throw new Error(`No value was found with category: ${category}`)
+			}
+
+			// unselect the source option
+			const sourceOptionBtns = document.querySelectorAll(`button[data-ops-category='${category}']`) as NodeListOf<HTMLElement>
+
+			sourceOptionBtns.forEach((el) => el.dataset.select = "0")
+
+			// mark this option as selected
+			target.dataset['select'] = "1"
+
+			// save option to graph
+			graph.setOption(category, value)
+		})
+	}
+
+	// Start!
+	graph.run()
+}, false)

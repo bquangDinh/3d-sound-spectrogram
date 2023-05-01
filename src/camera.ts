@@ -11,11 +11,25 @@ export class Camera {
 
 	private yaw = -90.0 // left and right
 
-	public cameraPos: vec3 = [0, 0, 3]
+	public cameraPos: vec3 = [-23, 84, 47] // an arbitrary position so I can see things better
 
-	private cameraFront: vec3 = [0, 0, -1]
+	private cameraFront: vec3 = [0.7, -0.7, 0]
 
 	private cameraUp: vec3 = [0, 1, 0]
+
+	private positionText: HTMLSpanElement | null = null
+
+	constructor() {
+		this.positionText = document.getElementById('cam-position')
+
+		this.updatePositionText()
+	}
+
+	private updatePositionText () {
+		if (this.positionText) {
+			this.positionText.innerHTML = `X = ${this.cameraPos[0]} | Y = ${this.cameraPos[1]} | Z = ${this.cameraPos[2]} | frX = ${this.cameraFront[0]} | frY = ${this.cameraFront[1]} | frZ = ${this.cameraFront[2]}`
+		}
+	}
 
 	public turnAround(offsetX: number, offsetY: number) {
 		// Control the speed of turning around by sensitivity
@@ -55,6 +69,8 @@ export class Camera {
 		vec3.scale(scaledCameraFront, this.cameraFront, speed)
 
 		vec3.add(this.cameraPos, this.cameraPos, scaledCameraFront)
+
+		this.updatePositionText()
 	}
 
 	public moveBackward(dt: number) {
@@ -65,6 +81,8 @@ export class Camera {
 		vec3.scale(scaledCameraFront, this.cameraFront, speed)
 
 		vec3.subtract(this.cameraPos, this.cameraPos, scaledCameraFront)
+
+		this.updatePositionText()
 	}
 
 	public turnLeft(dt: number) {
@@ -79,6 +97,8 @@ export class Camera {
 		vec3.scale(cameraRight, cameraRight, speed)
 
 		vec3.subtract(this.cameraPos, this.cameraPos, cameraRight)
+
+		this.updatePositionText()
 	}
 
 	public turnRight(dt: number) {
@@ -93,6 +113,8 @@ export class Camera {
 		vec3.scale(cameraRight, cameraRight, speed)
 
 		vec3.add(this.cameraPos, this.cameraPos, cameraRight)
+
+		this.updatePositionText()
 	}
 
 	public getViewMatrix () {

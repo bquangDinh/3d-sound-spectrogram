@@ -1,14 +1,33 @@
+export const SCRIPT_SHADER_TYPES = {
+	VERTEX_SHADER: 'x-shader/x-vertex',
+	FRAGMENT_SHADER: 'x-shader/x-fragment'
+}
+
 export class Shader {
 	private _shader: WebGLShader
 
-	static fromScript(scriptTagId: string, shaderType: number, gl: WebGL2RenderingContext) {
-		const source = document.querySelector(`#${scriptTagId}`)
+	static fromScript(gl: WebGL2RenderingContext, scriptTagId: string, type?: number) {
+		const source = document.querySelector(`#${scriptTagId}`) as HTMLScriptElement
 
 		if (!source) {
 			throw new Error(`Scipt not found with ID: ${scriptTagId}`)
 		}
 
 		const content = source.innerHTML.trim()
+
+		let shaderType: number
+
+		if (type) {
+			shaderType = type
+		} else {
+			if (source.type === SCRIPT_SHADER_TYPES.VERTEX_SHADER || source.getAttribute('type') === SCRIPT_SHADER_TYPES.VERTEX_SHADER) {
+				shaderType = gl.VERTEX_SHADER
+			} else if (source.type === SCRIPT_SHADER_TYPES.FRAGMENT_SHADER || source.getAttribute('type') === SCRIPT_SHADER_TYPES.FRAGMENT_SHADER) {
+				shaderType = gl.FRAGMENT_SHADER
+			} else {
+				throw new Error('Script shader type is not valid')
+			}
+		}
 
 		return new Shader(gl, content, shaderType)
 	}

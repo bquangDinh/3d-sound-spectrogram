@@ -1,10 +1,17 @@
-import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
 import { Camera } from "./camera";
-import { Shader } from "./webgl/shader";
-import { ShaderProgram } from "./webgl/shader-program";
-import { NumberUtils } from "./utils";
-import { max } from "lodash";
+
+/* Constants */
+import { CONSTANTS } from "./constants";
 import { EdgeVertexIndices, TriangleTable } from "./lookup-table";
+
+/* Utils */
+import { max } from "lodash";
+import { NumberUtils } from "./utils";
+import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
+
+/* WebGL */
+import { ShaderProgram } from "./webgl/shader-program";
+import { Shader } from "./webgl/shader";
 
 export class MarchingCube {
 	private shaderProgram!: ShaderProgram
@@ -30,28 +37,7 @@ export class MarchingCube {
 
 	private VAO: WebGLVertexArrayObject | null = null
 
-	// TEST CUBE
-	private cube_vertices = [
-		-0.5, -0.5, -0.5,
-		0.5, -0.5, -0.5,
-		0.5, 0.5, -0.5,
-		-0.5, 0.5, -0.5,
-		-0.5, -0.5, 0.5,
-		0.5, -0.5, 0.5,
-		0.5, 0.5, 0.5,
-		-0.5, 0.5, 0.5
-	]
-
-	private cube_indices = [
-		0, 1, 3, 3, 1, 2,
-		1, 5, 2, 2, 5, 6,
-		5, 4, 6, 6, 4, 7,
-		4, 0, 7, 7, 0, 3,
-		3, 2, 7, 7, 2, 6,
-		4, 5, 0, 0, 5, 1
-	]
-
-	private readonly DIMENSIONS: vec3 = [512, 24, 50]
+	private readonly DIMENSIONS: vec3 = [512, 24, 65]
 
 	private readonly VOXEL_SIZE = 1
 
@@ -78,9 +64,9 @@ export class MarchingCube {
 		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
 		// Create Shaders
-		const vertexShader = Shader.fromScript('vertex-shader', gl.VERTEX_SHADER, gl)
+		const vertexShader = Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT3D.VERTEX_SCRIPT_ID)
 
-		const fragmentShader =  Shader.fromScript('fragment-shader', gl.FRAGMENT_SHADER, gl)
+		const fragmentShader =  Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT3D.VERTEX_SCRIPT_ID)
 
 		// Create Shader Program
 		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
@@ -175,14 +161,18 @@ export class MarchingCube {
 
 		let height: number, value: number, index: number, maxHeightFFT: number, fft: Uint8Array
 
+		let zIndex = 0
+
 		// Update every vertices's densities
 		for (let z = 0; z < this.DIMENSIONS[2]; ++z) {
+			zIndex = this.DIMENSIONS[2] - 1 - z
+
 			// fft[z] is undefined here so skip this iteration
 			if (z >= this.ffts.length) {
 				continue
 			}
 
-			fft = this.ffts[z]
+			fft = this.ffts[this.ffts.length - 1 - z]
 
 			maxHeightFFT = max(fft) ?? 0
 
@@ -195,7 +185,7 @@ export class MarchingCube {
 
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
-					index = NumberUtils.getIndexFromXYZ(x, y, z, this.DIMENSIONS)
+					index = NumberUtils.getIndexFromXYZ(x, y, zIndex, this.DIMENSIONS)
 
 					if (x >= fft.length) {
 						// No data at x, then height is 0
@@ -209,7 +199,7 @@ export class MarchingCube {
 							},
 							toRange: {
 								min: 0,
-								max: MAX_HEIGHT
+								max: MAX_HEIGHT - this.VOXEL_SIZE
 							}
 						})
 					}
@@ -266,7 +256,8 @@ export class MarchingCube {
 		gl.bindVertexArray(this.VAO)
 
 		// Make canvas transparent
-		gl.clearColor(0, 0, 0, 0)
+		// Make background black
+		gl.clearColor(0, 0, 0, 1)
 		gl.clear(gl.COLOR_BUFFER_BIT)
 
 		gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / 6)
@@ -433,50 +424,6 @@ export class MarchingCube {
 
 	// 	gl.drawArrays(gl.POINTS, 0, this.vertices.length / 3)
 	// }
-
-	private testDrawCube () {
-		const gl = this.gl
-
-		if (!gl) {
-			throw new Error('No WebGL2Context found')
-		}
-
-		gl.bindVertexArray(this.VAO)
-
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
-
-		// Fetch vertices into buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.cube_vertices), gl.STATIC_DRAW)
-
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indicesBuffer)
-
-		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.cube_indices), gl.STATIC_DRAW)
-
-		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
-
-		gl.enableVertexAttribArray(this.positionAttributeLocation)
-
-		// Instruct WebGL how to read the buffer
-		const size = 3 // x, y, z components
-		const type = gl.FLOAT
-		const normalize = false
-		const stride = 0
-		const offset = 0
-
-		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
-
-		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indicesBuffer)
-
-		// Make canvas transparent
-		gl.clearColor(0, 0, 0, 0)
-		gl.clear(gl.COLOR_BUFFER_BIT)
-
-		this.shaderProgram.use()
-
-		gl.bindVertexArray(this.VAO)
-
-		gl.drawElements(gl.TRIANGLES, this.cube_indices.length, gl.UNSIGNED_SHORT, 0)
-	}
 
 	/**
 	 * Process Keyboard Input

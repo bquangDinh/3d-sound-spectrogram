@@ -1,13 +1,40 @@
-import { util as FFTUtil } from "fft-js";
-import { FileUtils, NumberUtils } from "./utils";
-import { min, max } from "lodash";
-import { Shader } from "./webgl/shader";
-import { ShaderProgram } from "./webgl/shader-program";
-import { MarchingCube } from "./marching-cube";
+/* Renderers */
+import { FFT2D } from "./renderers/fft-2d";
+
+export type GraphOptions = 'source' | 'cameraMovement' | 'graph'
+
+export const GRAPH_OPS = {
+	FFT3D: 'fft-3d',
+	FFT2D: 'fft-2d',
+	FFT3D_POINTGRID: 'fft-3d-point-grid'
+}
+
+export const SOURCE_OPS = {
+	MIC: 'mic',
+	SOUNDTRACK: 'soundtrack'
+}
 
 export class Graph {
 	private canvas!: HTMLCanvasElement
+
 	private canvasContainer!: HTMLDivElement
+
+	private readonly FFT_SIZE = 512
+
+	private analyser: AnalyserNode | null = null
+
+	private dataArray: Uint8Array = new Uint8Array()
+
+	private isInitialized = false
+
+	private options: Record<GraphOptions, string> = {
+		source: 'mic',
+		cameraMovement: 'lock',
+		graph: '3d',
+	}
+
+	/* Graph Renderers */
+	private fft2dRenderer: FFT2D
 
 	constructor(
 		canvasId: string,
@@ -22,409 +49,109 @@ export class Graph {
 
 		this.canvas.width = this.canvasContainer.clientWidth
 		this.canvas.height = this.canvasContainer.clientHeight
+
+		this.fft2dRenderer = new FFT2D(this.canvas)
 	}
 
-	public async fromFile (file: File) {
-		const arrayBuffer = await FileUtils.getArrayBufferFromBlob(file)
-
-		const audioData = await FileUtils.getAudioDataFromArrayBuffer(arrayBuffer, {
-			channel: 0
-		})
-
-		// Since FFT only accept array of length of power of 2
-		// So I have to do some padding here
-		const audioArray = Array.from(audioData)
-
-		const nextPowerOf2 = NumberUtils.getTheNextHighestPowerOf2(audioArray.length)
-
-		if (nextPowerOf2 !== audioArray.length) {
-			for (let i = audioArray.length; i < nextPowerOf2; ++i) {
-				audioArray.push(0)
-			}
+	public async init () {
+		if (this.isInitialized) {
+			console.warn('Graph has been initialized')
+			return
 		}
 
-		const phasors = await FileUtils.getFFTFrequenciesFromArray(audioArray)
+		// Init analyser node
+		await this.initAnalyser();
 
-		const ctx = this.canvas.getContext('2d')
+		/* Initialize Renderers */
+		this.initRenderers()
 
-		if (!ctx) {
-			throw new Error('Your browser does not support canvas')
-		}
-
-		const magnitudes = FFTUtil.fftMag(phasors) as number[]
-		const frequecies = FFTUtil.fftFreq(phasors, 4000) as number[]
-
-		const minMagnitude = min(magnitudes) as number
-		const maxMagnitude = max(magnitudes) as number
-
-		const getXFromFrequency = (fre: number) => {
-			return NumberUtils.normalize({
-				value: fre,
-				fromRange: {
-					min: frequecies[0],
-					max: frequecies[frequecies.length - 1]
-				},
-				toRange: {
-					min: 0,
-					max: this.canvas.width
-				}
-			})
-		}
-
-		const getYFromMagnitude = (mag: number) => {
-			return NumberUtils.normalize({
-				value: mag,
-				fromRange: {
-					min: minMagnitude,
-					max: maxMagnitude,
-				},
-				toRange: {
-					// Since 0,0 is the top left corner of the canvas
-					// if min is 0, and max is height, the graph will be upside down
-					min: this.canvas.height - 10,
-					max: this.canvas.height / 2,
-				}
-			})
-		}
-
-		const DELTAX = this.canvas.width / frequecies.length
-
-		let lastX = getXFromFrequency(frequecies[0])
-		let lastY = getYFromMagnitude(magnitudes[0])
-
-		let x: number, y: number
-
-		for (let i = 1; i < frequecies.length; ++i) {
-			x = getXFromFrequency(frequecies[i])
-			y = getYFromMagnitude(magnitudes[i])
-
-			ctx.beginPath()
-			ctx.moveTo(lastX, lastY)
-			ctx.lineTo(x + DELTAX, y)
-			ctx.stroke()
-
-			lastX = x + DELTAX
-			lastY = y
-		}
-
+		this.isInitialized = true
 	}
 
-	public async fromMicrophone () {
+	private async initAnalyser () {
 		if (!navigator.mediaDevices.getUserMedia) {
-			throw new Error('Your browser does not support microphone')
+			// Browser does not support microphone
+			this.analyser = null
+		} else {
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+			const audioContext = new AudioContext()
+
+			const mic = audioContext.createMediaStreamSource(stream)
+
+			const analyser = audioContext.createAnalyser()
+
+			analyser.fftSize = this.FFT_SIZE
+
+			mic.connect(analyser)
+
+			analyser.connect(audioContext.destination)
+
+			this.analyser = analyser
+
+			this.dataArray = new Uint8Array(analyser.frequencyBinCount)
 		}
-
-		const ctx = this.canvas.getContext('2d')
-
-		if (!ctx) {
-			throw new Error('Your browser does not support canvas')
-		}
-
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-
-		const audioContext = new AudioContext()
-
-		const mic = audioContext.createMediaStreamSource(stream)
-
-		const analyser = audioContext.createAnalyser()
-
-		analyser.fftSize = 1024
-
-		const bufferLength = analyser.frequencyBinCount
-
-		const dataArray = new Uint8Array(bufferLength)
-
-		mic.connect(analyser)
-
-		analyser.connect(audioContext.destination)
-
-		const draw = () => {
-			requestAnimationFrame(draw)
-
-			analyser.getByteFrequencyData(dataArray)
-
-			ctx.fillStyle = "rgb(0, 0, 0)";
-			ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-			const barWidth = (this.canvas.width / bufferLength) * 2.5;
-			let barHeight;
-			let x = 0;
-
-			for (let i = 0; i < bufferLength; i++) {
-				barHeight = dataArray[i];
-
-				ctx.fillStyle = "rgb(" + (barHeight + 100) + ",50,50)";
-				ctx.fillRect(
-					x,
-					this.canvas.height - barHeight / 2,
-					barWidth,
-					barHeight / 2
-				);
-
-				x += barWidth + 1;
-			}
-		}
-
-		draw()
 	}
 
-	private async fromMic () {
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-
-		const audioContext = new AudioContext()
-
-		const mic = audioContext.createMediaStreamSource(stream)
-
-		const analyser = audioContext.createAnalyser()
-
-		analyser.fftSize = 512
-
-		mic.connect(analyser)
-
-		analyser.connect(audioContext.destination)
-
-		return analyser
+	private async initRenderers () {
+		this.fft2dRenderer.init()
+		this.fft2dRenderer.connectDataSource(this.dataArray)
 	}
 
-	public async testWebGL () {
-		const gl = this.canvas.getContext('webgl2')
-
-		if (!gl) {
-			throw new Error('Your browser does not support WebGL2')
-		}
-
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-		const vertexShaderSource = `#version 300 es
-
-			// an attribute is an input (in) to a vertex shader.
-			// It will receive data from a buffer
-			in vec2 a_position;
-
-			uniform vec2 u_resolution;
-
-			// all shaders have a main function
-			void main() {
-				// Convert the position from pixels to -1 -> +1 in clip space
-				vec2 zeroToOne = a_position / u_resolution;
-				vec2 zeroToTwo = zeroToOne * 2.0;
-				vec2 clipSpace = zeroToTwo - 1.0;
-
-				gl_Position = vec4(clipSpace, 0, 1);
-			}
-		`;
-
-		const fragmentShaderSource = `#version 300 es
-
-			// fragment shaders don't have a default precision so we need
-			// to pick one. highp is a good default. It means "high precision"
-			precision highp float;
-
-			// we need to declare an output for the fragment shader
-			out vec4 outColor;
-
-			void main() {
-				// Just set the output to a constant reddish-purple
-				outColor = vec4(1, 0, 0.5, 1);
-			}
-		`;
-
-		const vertexShader = new Shader(gl, vertexShaderSource, gl.VERTEX_SHADER)
-
-		const fragmentShader = new Shader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER)
-
-		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
-
-		const positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
-
-		// Create VAO
-		const vao = gl.createVertexArray()
-
-		// Use this VAO
-		gl.bindVertexArray(vao)
-
-		// Create position buffer that contains every point's locations in FFT
-		const lineBuffer = gl.createBuffer()
-
-		const indexBuffer = gl.createBuffer()
-
-		const analyser = await this.fromMic()
-
-		const bufferLength = analyser.frequencyBinCount
-
-		const dataArray = new Uint8Array(bufferLength)
-
-		let pointPositions: number[] = []
-
-		let indices: number[] = []
-
-		const draw = () => {
-			requestAnimationFrame(draw)
-
-			// Make sure the buffer is cleared
-			pointPositions = []
-
-			indices = []
-
-			// Fetch dataArray with data from the microphone
-			analyser.getByteFrequencyData(dataArray)
-
-			const DELTAX = gl.canvas.width / bufferLength
-
-			// Start drawing from the bottom-left corner of the canvas
-			let lastX = 0, lastY = 0
-
-			let y: number
-
-			pointPositions.push(lastX, lastY)
-
-			for (let i = 0; i < bufferLength; ++i) {
-				y = dataArray[i]
-
-				pointPositions.push(lastX + DELTAX, y)
-
-				indices.push(i, i + 1)
-
-				// Update lastX, lastY
-				lastX += DELTAX
-				lastY = y
-			}
-
-			// Tell WebGL to use the array buffer
-			gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
-
-			// Fetch the array buffer
-			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pointPositions), gl.DYNAMIC_DRAW)
-
-			// Tell WebGL to use the indices array buffer
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
-
-			// Fetch the index buffer
-			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.DYNAMIC_DRAW)
-
-			// Use line buffer
-			gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
-
-			gl.enableVertexAttribArray(positionAttributeLocation)
-
-			// Instruct WebGL how to read the buffer
-			const size = 2 // x, y components
-			const type = gl.FLOAT
-			const normalize = false
-			const stride = 0
-			const offset = 0
-
-			gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset)
-
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
-
-			// Make canvas transparent
-			gl.clearColor(0, 0, 0, 0)
-			gl.clear(gl.COLOR_BUFFER_BIT)
-
-			shaderProgram.use()
-
-			gl.bindVertexArray(vao)
-
-			shaderProgram.setVec2('u_resolution', [gl.canvas.width, gl.canvas.height])
-
-			gl.drawElements(gl.LINES, indices.length, gl.UNSIGNED_SHORT, 0)
-
-		}
-
-		draw()
+	public setOption (key: GraphOptions, value: string) {
+		this.options[key] = value
 	}
 
-	public async testMarchingCubes () {
-		this.canvas.addEventListener('click', async () => {
-			await this.canvas.requestPointerLock()
-		})
-
-		const gl = this.canvas.getContext('webgl2')
-
-		if (!gl) {
-			throw new Error('Your browser does not support WebGL2')
-		}
-
-		const analyser = await this.fromMic()
-
-		const bufferLength = analyser.frequencyBinCount
-
-		const dataArray = new Uint8Array(bufferLength)
-
+	public run () {
+		/* Keep track of time */
 		let previousTime = 0
-		let animation = -1
 
-		let time = 0
-
-		const WAIT = 1
-
-		const mc = new MarchingCube(gl)
-
-		mc.init()
+		let deltaTime = 0
 
 		const draw = (currentTime: number) => {
-			// Fetch dataArray with data from the microphone
-			analyser.getByteFrequencyData(dataArray)
-
 			// Convert time to seconds
 			currentTime *= 0.001
 
-			// Compute how much time has passed since the last frame
-			const deltaTime = currentTime - previousTime
+			deltaTime = currentTime - previousTime
 
 			previousTime = currentTime
 
-			mc.addFFT(dataArray)
+			this.update(deltaTime)
 
-			mc.processKeyInput(deltaTime)
+			this.render(deltaTime)
 
-			mc.update(deltaTime)
-
-			animation = requestAnimationFrame(draw)
+			requestAnimationFrame(draw)
 		}
 
-		animation = requestAnimationFrame(draw)
+		requestAnimationFrame(draw)
+	}
 
-		const KeyBoardUpCb = (ev: KeyboardEvent) => {
-			if (ev.code === 'Escape') {
-				if (animation !== -1) {
-					// Stop
-					cancelAnimationFrame(animation)
+	private update (_: number) {
+		switch (this.options.source) {
+			case SOURCE_OPS.MIC:
+				this.updateSourceFromMic()
+		}
+	}
 
-					animation = -1
-				}
+	private async render (dt: number) {
+		switch (this.options.graph) {
+			case GRAPH_OPS.FFT2D:
+				this.fft2dRenderer.render(dt)
+		}
+	}
 
-				document.removeEventListener('keyup', KeyBoardUpCb)
-			} else {
-				mc.keysMap[ev.code] = false
+	/* Source Functions */
+	private updateSourceFromMic () {
+		if (this.analyser) {
+			// In case I forget
+			if (this.dataArray.length < this.analyser.frequencyBinCount) {
+				this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
 			}
+
+			// Fetch dataArray with data from the microphone
+			this.analyser.getByteFrequencyData(this.dataArray)
+		} else {
+			console.warn('No analyser node found! Your browser may not support or block using microphone')
 		}
-
-		const KeyBoardDownCb = (ev: KeyboardEvent) => {
-			if (ev.code === 'Escape') {
-				if (animation !== -1) {
-					// Stop
-					cancelAnimationFrame(animation)
-
-					animation = -1
-				}
-
-				document.removeEventListener('keydown', KeyBoardDownCb)
-			} else {
-				mc.keysMap[ev.code] = true
-			}
-		}
-
-		const MouseMoveCb = (ev: MouseEvent) => {
-			mc.processMouseInput(ev.movementX, ev.movementY)
-		}
-
-		// Add Event to listen to keyboard change
-		document.addEventListener('keydown', KeyBoardDownCb)
-
-		document.addEventListener('keyup', KeyBoardUpCb)
-
-		document.addEventListener('mousemove', MouseMoveCb)
 	}
 }
