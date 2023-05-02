@@ -15,7 +15,7 @@ export class Camera {
 
 	private yaw = -90.0 // left and right
 
-	private isLocked = true
+	private isLocked = false
 
 	public cameraPos: vec3 = vec3.create()
 
@@ -27,6 +27,8 @@ export class Camera {
 
 	public rotationText: HTMLSpanElement | null = null
 
+	public allowTurning = false
+
 	constructor() {}
 
 	public setSpecular(pos: vec3, rot: vec3) {
@@ -36,9 +38,9 @@ export class Camera {
 	}
 
 	public moveCameraToSpecularLocation() {
-		this.cameraPos = this.SPECULAR_POS
+		this.cameraPos = vec3.clone(this.SPECULAR_POS)
 
-		this.cameraFront = this.SPECULAR_ROT
+		this.cameraFront = vec3.clone(this.SPECULAR_ROT)
 
 		this.updatePositionText()
 
@@ -58,7 +60,7 @@ export class Camera {
 	}
 
 	public turnAround(offsetX: number, offsetY: number) {
-		if (this.isLocked) return
+		if (this.isLocked || !this.allowTurning) return
 
 		// Control the speed of turning around by sensitivity
 		offsetX *= this.SENSITIVITY

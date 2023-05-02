@@ -80,7 +80,7 @@ h1 {
 
 #canvas-container {
 	width: 100%;
-	height: 75vh;
+	height: 70vh;
 	background-color: black;
 	margin: 10px 0 10px 0;
 }
@@ -109,6 +109,31 @@ h1 {
 	.controller .content {
 		height: 50px;
 		margin-top: 5px;
+	}
+}
+
+#bars-container {
+	width: 100%;
+	position: relative;
+
+	#soundtrack-bar {
+		width: 100%;
+		height: 2px;
+		background-color: $white-color;
+		position: relative;
+
+		#trackball {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background-color: $white-color;
+			position: absolute;
+			top: -4px;
+			left: 0;
+			transform-origin: 0% 0%;
+			transform: translateX(0px);
+			z-index: 2;
+		}
 	}
 }
 
@@ -248,8 +273,22 @@ h1 {
 		opacity: 0.5;
 		transition: all .3s;
 
+		label {
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+
+			cursor: pointer;
+		}
+
 		i {
 			font-size: 1.2em;
+		}
+
+		input[type="file"] {
+			display: none;
 		}
 
 		&.disabled {

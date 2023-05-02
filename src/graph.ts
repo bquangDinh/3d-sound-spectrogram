@@ -9,8 +9,9 @@ import { Renderer } from "./renderers/renderer";
 /* Audio Files */
 import ValseOp69No1 from './assets/audios/valse_op69_no_1.mp3'
 import IllAlwaysRemember from './assets/audios/illalwaysremember.mp3'
+import Menuet from './assets/audios/menuet.mp3'
 
-import { UIUtils } from "./utils/utils";
+import { FileUtils, UIUtils } from "./utils/utils";
 
 export type GraphOptions = 'source' | 'cameraMovement' | 'graph' | 'webworker' | 'soundtrack'
 
@@ -22,7 +23,8 @@ export const GRAPH_OPS = {
 
 export const SOURCE_OPS = {
 	MIC: 'mic',
-	SOUNDTRACK: 'soundtrack'
+	SOUNDTRACK: 'soundtrack',
+	FILE: 'file',
 }
 
 export const CAMERA_MOVEMENT_OPS = {
@@ -32,15 +34,21 @@ export const CAMERA_MOVEMENT_OPS = {
 
 export const SOUNDTRACKS = {
 	ILL_ALWAYS_REMEMBER: '1',
-	VALSE_OP_69_N1: '2',
+	VALSE_OP_69_N1: '3',
+	MENUET: '2',
 }
 
-export type SourceType = 'mic' | 'soundtrack'
+export type SourceType = 'mic' | 'soundtrack' | 'file'
 
 export class Graph {
+	/* DOM Elements */
 	private canvas!: HTMLCanvasElement
 
 	private canvasContainer!: HTMLDivElement
+
+	private trackbar: HTMLElement | null = null
+
+	private trackball: HTMLElement | null = null
 
 	private readonly FFT_SIZE = 512
 
@@ -82,12 +90,17 @@ export class Graph {
 
 	private activeRenderer: Renderer | null = null
 
+	private audioStartedAt = 0
+
 	constructor(
 		canvasId: string,
 		canvasContainerId: string
 	) {
 		this.canvas = document.getElementById(canvasId) as HTMLCanvasElement
 		this.canvasContainer = document.getElementById(canvasContainerId) as HTMLDivElement
+
+		this.trackbar = document.getElementById(CONSTANTS.DOM_ELEMENTS.TRACKBAR_ID)
+		this.trackball = document.getElementById(CONSTANTS.DOM_ELEMENTS.TRACKBAR_BALL_ID)
 
 		if (!this.canvas || !this.canvasContainer) {
 			throw new Error('Canvas Or Container is null')
@@ -189,8 +202,47 @@ export class Graph {
 	}
 
 	private async render (dt: number) {
+		if (this.currentAudioSource === 'soundtrack' || this.currentAudioSource === 'file') {
+			// update trackbar
+			this.renderTrackbar()
+		} else {
+			this.toggleShowTrackbar(false)
+		}
+
 		if (this.activeRenderer) {
 			this.activeRenderer.render(dt)
+		}
+	}
+
+	private renderTrackbar () {
+		if (!this.audioContext || !this.soundtrack || !this.soundtrack.buffer) {
+			return
+		}
+
+		const currentTime = (this.audioContext.currentTime - this.audioStartedAt) * this.soundtrack.playbackRate.value
+
+		const percentage = currentTime / this.soundtrack.buffer.duration
+
+		this.toggleShowTrackbar(true)
+
+		this.setTrackbarPercentage(percentage)
+	}
+
+	private toggleShowTrackbar (show: boolean) {
+		if (this.trackbar) {
+			if (show) {
+				this.trackbar.classList.remove('d-none')
+			} else {
+				this.trackbar.classList.add('d-none')
+			}
+		}
+	}
+
+	private setTrackbarPercentage (percentage: number) {
+		if (this.trackball && this.trackbar) {
+			const x = (this.trackbar.clientWidth - 10) * percentage
+
+			this.trackball.style.transform = `translateX(${x}px)`
 		}
 	}
 
@@ -243,6 +295,14 @@ export class Graph {
 
 		// Set camera options
 		if (this.activeRenderer.camera) {
+			if (document.pointerLockElement) {
+				// Mouse is being locked in canvas
+				this.activeRenderer.camera.allowTurning = true
+			} else {
+				// Mouse no longer locked in canvas
+				this.activeRenderer.camera.allowTurning = false
+			}
+
 			switch (this.options.cameraMovement) {
 				case CAMERA_MOVEMENT_OPS.FREE:
 					this.activeRenderer.camera.unlockCamera()
@@ -264,6 +324,11 @@ export class Graph {
 	}
 
 	private setSource() {
+		if (this.options.source === 'file') {
+			// Will be called when file is arrive
+			return;
+		}
+
 		if (this.currentAudioSource === 'mic' && this.options.source === 'mic') {
 			// mic is already set
 			return
@@ -281,7 +346,7 @@ export class Graph {
 			return;
 		}
 
-		let connectSourcePromise: Promise<void>
+		let connectSourcePromise: Promise<boolean>
 
 		this.audioSourceStatus = 'loading'
 
@@ -295,26 +360,34 @@ export class Graph {
 				connectSourcePromise = this.connectMicrophone()
 		}
 
-		connectSourcePromise.then(() => {
-			this.audioSourceStatus = 'done'
+		connectSourcePromise.then((success) => {
+			if (success) {
+				this.audioSourceStatus = 'done'
 
-			UIUtils.setSubHeaderText('Done!', 'info')
+				UIUtils.setSubHeaderText('Done!', 'info')
 
-			if (this.currentAudioSource === 'mic') {
-				// Make sure to disconnect
-				this.disconnectAudioSource()
-			} else {
-				// Make sure to disconnect
-				this.disconnectMirophone()
-			}
-
-			setTimeout(() => {
 				if (this.currentAudioSource === 'mic') {
-					UIUtils.setSubHeaderText('From mic', 'microphone-recording')
+					// Make sure to disconnect
+					this.disconnectAudioSource()
 				} else {
-					UIUtils.setSubHeaderText('From soundtrack', 'soundtrack-playing')
+					// Make sure to disconnect
+					this.disconnectMirophone()
 				}
-			}, 1500)
+
+				setTimeout(() => {
+					if (this.currentAudioSource === 'mic') {
+						UIUtils.setSubHeaderText('From mic', 'microphone-recording')
+					} else {
+						if (this.currentSoundtrack === SOUNDTRACKS.ILL_ALWAYS_REMEMBER) {
+							UIUtils.setSubHeaderText("Now playing <a href='https://www.youtube.com/watch?v=ZJLngfJH-rQ' target='_blank' rel='noopener noreferrer'>I'll Always Remember - Toshifumi Hinata</a>", 'soundtrack-playing')
+						} else if (this.currentSoundtrack === SOUNDTRACKS.VALSE_OP_69_N1) {
+							UIUtils.setSubHeaderText("Now playing <a href='https://www.youtube.com/watch?v=_SSkoMLobII&list=RD_SSkoMLobII&start_radio=1' target='_blank' rel='noopener noreferrer'>Chopin - Valse de l'adieu, op. 69 no. 1</a>", 'soundtrack-playing')
+						} else if (this.currentSoundtrack === SOUNDTRACKS.MENUET) {
+							UIUtils.setSubHeaderText("Now playing <a href='https://www.youtube.com/watch?v=oSkkddfHaP4' target='_blank' rel='noopener noreferrer'>Menuet - Toshifumi Hinata</a>", 'soundtrack-playing')
+						}
+					}
+				}, 1500)
+			}
 		})
 
 		this.currentAudioSource = this.options.source as SourceType
@@ -328,30 +401,38 @@ export class Graph {
 		}
 
 		if (!navigator.mediaDevices.getUserMedia) {
-			console.warn('Your browser does not support microphone or the app does not have recording permission')
-			return;
+			UIUtils.setSubHeaderText('Your browser does not support microphone or the app does not have recording permission', 'error')
+			return false
 		}
 
 		if (this.soundConnections.mic) {
 			// already connected to microphone
-			return;
+			return true
 		}
 
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-		this.mediaStream = stream
+			this.mediaStream = stream
 
-		if (!this.mic) {
-			const mic = this.audioContext.createMediaStreamSource(stream)
+			if (!this.mic) {
+				const mic = this.audioContext.createMediaStreamSource(stream)
 
-			this.mic = mic
+				this.mic = mic
+			}
+
+			this.mic.connect(this.analyser)
+
+			this.analyser.connect(this.audioContext.destination)
+
+			this.soundConnections.mic = true
+
+			return true
+		} catch {
+			UIUtils.setSubHeaderText('Your browser does not support microphone or the app does not have recording permission', 'error')
 		}
 
-		this.mic.connect(this.analyser)
-
-		this.analyser.connect(this.audioContext.destination)
-
-		this.soundConnections.mic = true
+		return false
 	}
 
 	private disconnectMirophone () {
@@ -382,14 +463,14 @@ export class Graph {
 		}
 	}
 
-	private async connectToSoundtrack (name: string): Promise<void> {
+	private async connectToSoundtrack (name: string): Promise<boolean> {
 		if (!this.analyser) {
 			throw new Error('No analyser was found!')
 		}
 
 		if (this.soundConnections.audio && this.currentSoundtrack === name) {
 			// already connected to soundtrack
-			return
+			return true
 		}
 
 		if (this.soundConnections.audio) {
@@ -402,6 +483,8 @@ export class Graph {
 			url = ValseOp69No1
 		} else if (name === SOUNDTRACKS.ILL_ALWAYS_REMEMBER) {
 			url = IllAlwaysRemember
+		} else if (name === SOUNDTRACKS.MENUET) {
+			url = Menuet
 		}
 
 		return new Promise((resolve, reject) => {
@@ -436,11 +519,15 @@ export class Graph {
 
 				this.soundConnections.audio = true
 
-				resolve()
+				this.audioStartedAt = this.audioContext.currentTime
+
+				resolve(true)
 			}
 
 			request.onerror = () => {
-				reject('Failed to connect audio source')
+				UIUtils.setSubHeaderText('Unable to request audio file. Please check your internet connection', 'error')
+
+				reject(false)
 			}
 
 			request.send()
@@ -472,6 +559,53 @@ export class Graph {
 			this.clearData()
 
 			this.soundConnections.audio = false
+		}
+	}
+
+	public async setSourceFromFile (file: File) {
+		if (!this.audioContext) {
+			throw new Error('No audio context')
+		}
+
+		if (!this.analyser) {
+			throw new Error('No analyser')
+		}
+
+		if (this.currentAudioSource === 'mic') {
+			this.disconnectMirophone()
+		} else {
+			// Disconnect previous soundtrack
+			this.disconnectAudioSource()
+		}
+
+		try {
+			const arrayBuffer = await FileUtils.getArrayBufferFromBlob(file)
+
+			const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer)
+
+			const source = this.audioContext.createBufferSource()
+
+			source.buffer = audioBuffer
+
+			source.connect(this.analyser)
+
+			this.analyser.connect(this.audioContext.destination)
+
+			source.loop = true
+
+			source.start(0)
+
+			UIUtils.setSubHeaderText(file.name, 'info')
+
+			this.soundtrack = source
+
+			this.currentAudioSource = 'file'
+
+			this.audioStartedAt = this.audioContext.currentTime
+
+			this.soundConnections.audio = true
+		} catch {
+			UIUtils.setSubHeaderText('Your file is not valid for audio', 'error')
 		}
 	}
 

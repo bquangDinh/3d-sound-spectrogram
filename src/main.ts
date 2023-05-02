@@ -135,6 +135,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 		UIUtils.adjustControllerLayout()
 	})
 
+	const audioBtn = document.getElementById('file-audio-input')
+
+	if (!audioBtn) {
+		throw new Error('Audio File Input not found')
+	}
+
+	audioBtn.addEventListener('change', (e: Event) => {
+		const inputFile = e.currentTarget as HTMLInputElement
+
+		if (inputFile.files) {
+			graph.setSourceFromFile(inputFile.files[0])
+		}
+	}, false)
+
 	// Start!
 	graph.run()
 }, false)

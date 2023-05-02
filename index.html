@@ -4,12 +4,31 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
+	<meta name="description" content="A little experiment displaying sound as a 3D Marching Cube Surface. You can play with your microphone or select some of my favorite soundtracks!"/>
+	<meta name="keywords" content="experiment, 3d, sound, spectrogram, graph, 2d, webgl, webgl2" />
+
+	<meta property="og:title" content="3D Sound Spectrogram - Marching Cube" />
+    <meta property="og:description" content="A little experiment displaying sound as a 3D Marching Cube Surface. You can play with your microphone or select some of my favorite soundtracks!" />
+    <meta property="og:url" content="" />
+
+	<meta property="og:image:url" content="/thumbnail.png" />
+    <meta property="og:image:secure_url" content="/thumbnail.png" />
+    <meta property="og:image:alt" content="3D Spectrogram Thumbnail" />
+	<meta property="og:image:type" content="image/png" />
+
+	<meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="3D Spectrogram - Marching Cube" />
+    <meta name="twitter:description" content="A little experiment displaying sound as a 3D Marching Cube Surface. You can play with your microphone or select some of my favorite soundtracks!" />
+
+    <title>3D Sound Spectrogram</title>
   </head>
   <body>
     <div id="app" class="center-container center-container--column">
 		<div id="header">
 			<h2>3D Sound Spectrogram - Marching Cube</h2>
+			<h4>
+				Quang Dinh Bui <a href="https://github.com/bquangDinh" target="_blank" rel="noopener noreferrer">Github</a>
+			</h4>
 			<span id="sub-header-text">
 			</span>
 		</div>
@@ -18,10 +37,16 @@
 			<canvas id="spectrogram-canvas"></canvas>
 		</div>
 
+		<div id="bars-container">
+			<div id="soundtrack-bar" class="d-none">
+				<div id="trackball"></div>
+			</div>
+		</div>
+
 		<div id="controller-container" class="center-container center-container--row">
 			<div class="controller">
 				<span>
-					<i class="fa-solid fa-music fa-beat-fade"></i> <span class="title">
+					<span class="title">
 						Soundtrack
 					</span>
 				</span>
@@ -39,7 +64,8 @@
 						</div>
 						<select>
 							<option value="1" selected>I'll Always Remember</option>
-							<option value="2">Valse de l'adieu, op. 69 no. 1</option>
+							<option value="2">Menuet</option>
+							<option value="3">Valse de l'adieu, op. 69 no. 1</option>
 						</select>
 					</div>
 				</div>
@@ -64,6 +90,15 @@
 							<span class="tooltip-text">
 								Source from microphone
 							</span>
+						</button>
+						<button class="option-btn" data-ops-category="source" data-ops-value="file" data-select="0">
+							<i class="fa-solid fa-file-audio"></i>
+							<span class="tooltip-text">
+								Source from file
+							</span>
+							<label>
+								<input type="file" id="file-audio-input">
+							</label>
 						</button>
 					</div>
 				</div>

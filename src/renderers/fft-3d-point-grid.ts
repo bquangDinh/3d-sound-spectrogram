@@ -81,7 +81,7 @@ export class FFT3DPointGrid extends Renderer {
 			CONSTANTS.CAMERA.FFT3D_POINTGRID.SPECULAR_ROT
 		)
 
-		this.camera.moveCameraToSpecularLocation()
+		this.camera.lockCamera()
 	}
 
 	private initWebGL () {

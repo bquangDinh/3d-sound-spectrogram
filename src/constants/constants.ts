@@ -29,7 +29,9 @@ export const CONSTANTS = {
 		SUB_HEADER_TEXT_ID: 'sub-header-text',
 		FPS_TEXT_ID: 'fps-text',
 		USE_WEBWORKER_CHECKBOX_ID: 'use-web-worker-cb',
-		WEBWORKER_CHECKBOX_CONTAINER_ID: 'webworker-cb-container'
+		WEBWORKER_CHECKBOX_CONTAINER_ID: 'webworker-cb-container',
+		TRACKBAR_BALL_ID: 'trackball',
+		TRACKBAR_ID: 'soundtrack-bar'
 	},
 	RENDERERS: {
 		NAMES: {
@@ -40,8 +42,8 @@ export const CONSTANTS = {
 	},
 	CAMERA: {
 		FFT3D: {
-			SPECULAR_POS: vec3.fromValues(-31.9, 50.8, 38.7),
-			SPECULAR_ROT: vec3.fromValues(0.9, -0.44, 0.02),
+			SPECULAR_POS: vec3.fromValues(-26.68, 48.63, 35.8),
+			SPECULAR_ROT: vec3.fromValues(0.94, -0.35, -0.02),
 		},
 		FFT3D_POINTGRID: {
 			SPECULAR_POS: vec3.fromValues(-57, 7, -46),

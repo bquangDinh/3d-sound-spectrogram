@@ -328,7 +328,8 @@ export const UIUtils = {
 		}
 
 		// Set height of controler based on height of canvas and header
-		const height = window.innerHeight - (canvasContainer.clientHeight + header.clientHeight)
+		// 5 is height of trackbar
+		const height = window.innerHeight - (canvasContainer.clientHeight + header.clientHeight + 5)
 
 		controllerContainer.style.height = `${height}px`
 
@@ -413,5 +414,5 @@ export const UIUtils = {
 			ele.classList.remove('disabled')
 			ele.removeAttribute('disabled')
 		}
-	}
+	},
 }

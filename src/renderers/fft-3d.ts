@@ -121,7 +121,7 @@ export class FFT3D extends Renderer {
 			CONSTANTS.CAMERA.FFT3D.SPECULAR_ROT
 		)
 
-		this.camera.moveCameraToSpecularLocation()
+		this.camera.lockCamera()
 	}
 
 	private initWebGL () {
@@ -775,7 +775,5 @@ export class FFT3D extends Renderer {
 
 	private async onCanvasClick () {
 		await this.canvas.requestPointerLock()
-
-		this.canvas.requestPointerLock()
 	}
 }
