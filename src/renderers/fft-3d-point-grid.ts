@@ -1,16 +1,16 @@
 /* Constants */
-import { CONSTANTS } from "../constants/constants";
+import { CONSTANTS } from '../constants/constants'
 
 /* Utils */
-import { max } from "lodash";
-import { NumberUtils } from "../utils/utils";
-import { glMatrix, mat4, vec3 } from "gl-matrix";
+import { max } from 'lodash'
+import { NumberUtils } from '../utils/utils'
+import { glMatrix, mat4, vec3 } from 'gl-matrix'
 
 /* WebGL */
-import { Shader } from "../webgl/shader";
-import { ShaderProgram } from "../webgl/shader-program";
-import { Renderer } from "./renderer";
-import { Camera } from "../webgl/camera";
+import { Shader } from '../webgl/shader'
+import { ShaderProgram } from '../webgl/shader-program'
+import { Renderer } from './renderer'
+import { Camera } from '../webgl/camera'
 
 export class FFT3DPointGrid extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID
@@ -21,6 +21,7 @@ export class FFT3DPointGrid extends Renderer {
 
 	private keysMap: Record<string, boolean> = {}
 
+	// eslint-disable-next-line @typescript-eslint/ban-types
 	private uniformSetters: Record<string, Function> = {}
 
 	private positionAttributeLocation = -1
@@ -50,7 +51,10 @@ export class FFT3DPointGrid extends Renderer {
 		}
 
 		if (!this.isWebGLSupported) {
-			this.log('error', 'No WebGL2 Rendering Context found! Your browser may not support WebGL2')
+			this.log(
+				'error',
+				'No WebGL2 Rendering Context found! Your browser may not support WebGL2',
+			)
 
 			// Since Marching Cube is solely based on WebGL2
 			// If there is no webgl2 available, then don't initialize it
@@ -70,35 +74,48 @@ export class FFT3DPointGrid extends Renderer {
 		this.log('log', 'Initialized')
 	}
 
-	private initCamera () {
+	private initCamera() {
 		this.camera = new Camera()
 
-		this.camera.positionText = document.getElementById(CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_POS_SPAN_ID)
-		this.camera.rotationText = document.getElementById(CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_ROT_SPAN_ID)
+		this.camera.positionText = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_POS_SPAN_ID,
+		)
+		this.camera.rotationText = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_ROT_SPAN_ID,
+		)
 
 		this.camera.setSpecular(
 			CONSTANTS.CAMERA.FFT3D_POINTGRID.SPECULAR_POS,
-			CONSTANTS.CAMERA.FFT3D_POINTGRID.SPECULAR_ROT
+			CONSTANTS.CAMERA.FFT3D_POINTGRID.SPECULAR_ROT,
 		)
 
 		this.camera.lockCamera()
 	}
 
-	private initWebGL () {
+	private initWebGL() {
 		const gl = this.gl
 
 		if (!gl) {
-			this.log('error', 'No WebGL2 Rendering Context found! Your browser may not support WebGL2')
+			this.log(
+				'error',
+				'No WebGL2 Rendering Context found! Your browser may not support WebGL2',
+			)
 			return
 		}
 
 		// Set GL viewport
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
 
 		// Create Shaders
-		const vertexShader = Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT3D_POINTGRID.VERTEX_SCRIPT_ID)
+		const vertexShader = Shader.fromScript(
+			gl,
+			CONSTANTS.SHADER_SCRIPTS.FFT3D_POINTGRID.VERTEX_SCRIPT_ID,
+		)
 
-		const fragmentShader =  Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT3D_POINTGRID.FRAGMENT_SCRIPT_ID)
+		const fragmentShader = Shader.fromScript(
+			gl,
+			CONSTANTS.SHADER_SCRIPTS.FFT3D_POINTGRID.FRAGMENT_SCRIPT_ID,
+		)
 
 		// Create Shader Program
 		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
@@ -113,13 +130,26 @@ export class FFT3DPointGrid extends Renderer {
 		// Calculating aspect by canvas.width / canvas.height is not recommended since CSS may influenced the size
 		// Should use canvas.clientWidth and canvas.clientHeight since those are constants and not influeced by CSS
 		shaderProgram.setUniforms(this.uniformSetters, {
-			'projection': mat4.perspective(mat4.create(), glMatrix.toRadian(45.0), (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight, 0.1, 300),
+			projection: mat4.perspective(
+				mat4.create(),
+				glMatrix.toRadian(45.0),
+				(gl.canvas as HTMLCanvasElement).clientWidth /
+					(gl.canvas as HTMLCanvasElement).clientHeight,
+				0.1,
+				300,
+			),
 		})
 
 		// Save attribute locations
-		this.positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
+		this.positionAttributeLocation = gl.getAttribLocation(
+			shaderProgram.program,
+			'a_position',
+		)
 
-		this.densityAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_density')
+		this.densityAttributeLocation = gl.getAttribLocation(
+			shaderProgram.program,
+			'a_density',
+		)
 
 		// Create VAO and Array Buffers
 		this.VAO = gl.createVertexArray()
@@ -143,13 +173,13 @@ export class FFT3DPointGrid extends Renderer {
 
 		// Turn on culling. By default backfacing triangles
 		// will be culled.
-		gl.enable(gl.CULL_FACE);
+		gl.enable(gl.CULL_FACE)
 
 		// Enable the depth buffer
-		gl.enable(gl.DEPTH_TEST);
+		gl.enable(gl.DEPTH_TEST)
 	}
 
-	private initData () {
+	private initData() {
 		// Initialize vertices data array
 		// Each data is a vec4 contains x, y, z coordinate of the point and density value as 0
 		// call z -> y -> z is COLUMN-MAJOR order
@@ -157,14 +187,17 @@ export class FFT3DPointGrid extends Renderer {
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
 					this.vertices.push(
-						x * this.VOXEL_SIZE, y * this.VOXEL_SIZE, z * this.VOXEL_SIZE, 0
+						x * this.VOXEL_SIZE,
+						y * this.VOXEL_SIZE,
+						z * this.VOXEL_SIZE,
+						0,
 					)
 				}
 			}
 		}
 	}
 
-	private initEvents () {
+	private initEvents() {
 		document.addEventListener('keydown', this.onKeyboardDown.bind(this))
 
 		document.addEventListener('keyup', this.onKeyboardUp.bind(this))
@@ -191,7 +224,7 @@ export class FFT3DPointGrid extends Renderer {
 				this.shaderProgram.use()
 
 				this.shaderProgram.setUniforms(this.uniformSetters, {
-					'view': this.camera.getViewMatrix()
+					view: this.camera.getViewMatrix(),
 				})
 
 				// Unbind program
@@ -220,12 +253,12 @@ export class FFT3DPointGrid extends Renderer {
 		super.clear()
 	}
 
-	private clearData () {
+	private clearData() {
 		this.ffts = []
 		this.vertices = []
 	}
 
-	private clearWebGL () {
+	private clearWebGL() {
 		const gl = this.gl
 
 		if (gl) {
@@ -256,7 +289,7 @@ export class FFT3DPointGrid extends Renderer {
 		}
 	}
 
-	private clearEvents () {
+	private clearEvents() {
 		document.removeEventListener('keydown', this.onKeyboardDown)
 
 		document.removeEventListener('keyup', this.onKeyboardUp)
@@ -266,6 +299,7 @@ export class FFT3DPointGrid extends Renderer {
 		this.canvas.removeEventListener('click', this.onCanvasClick)
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private renderMarchingCubes(_: number) {
 		const gl = this.gl
 
@@ -286,7 +320,11 @@ export class FFT3DPointGrid extends Renderer {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
 		// Fetch data into buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW)
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array(this.vertices),
+			gl.DYNAMIC_DRAW,
+		)
 
 		// Fetch data into position attribute from the buffer
 		// Enable the attribute in the shader program
@@ -300,7 +338,14 @@ export class FFT3DPointGrid extends Renderer {
 		let offset = 0
 
 		// Fetch instruction to Shader Program
-		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
+		gl.vertexAttribPointer(
+			this.positionAttributeLocation,
+			size,
+			type,
+			normalize,
+			stride,
+			offset,
+		)
 
 		// Fetch data into density attribute from the buffer
 		gl.enableVertexAttribArray(this.densityAttributeLocation)
@@ -310,7 +355,14 @@ export class FFT3DPointGrid extends Renderer {
 		offset = 12
 
 		// Fetch instruction to Shader Program
-		gl.vertexAttribPointer(this.densityAttributeLocation, size, type, normalize, stride, offset)
+		gl.vertexAttribPointer(
+			this.densityAttributeLocation,
+			size,
+			type,
+			normalize,
+			stride,
+			offset,
+		)
 
 		gl.bindVertexArray(this.VAO)
 
@@ -332,7 +384,7 @@ export class FFT3DPointGrid extends Renderer {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
 	}
 
-	private updateFFT () {
+	private updateFFT() {
 		if (!this.dataSource) {
 			return
 		}
@@ -351,7 +403,7 @@ export class FFT3DPointGrid extends Renderer {
 		this.ffts.push(clone)
 	}
 
-	private updateData () {
+	private updateData() {
 		// If FFT data is empty, then nothing to do here
 		if (this.ffts.length === 0) return
 
@@ -384,7 +436,11 @@ export class FFT3DPointGrid extends Renderer {
 
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
-					index = NumberUtils.getIndexFromXYZ(x * 4, y, z, [this.DIMENSIONS[0] * 4, this.DIMENSIONS[1], this.DIMENSIONS[2]])
+					index = NumberUtils.getIndexFromXYZ(x * 4, y, z, [
+						this.DIMENSIONS[0] * 4,
+						this.DIMENSIONS[1],
+						this.DIMENSIONS[2],
+					])
 
 					index *= 4
 
@@ -398,12 +454,12 @@ export class FFT3DPointGrid extends Renderer {
 							value: fft[xComp],
 							fromRange: {
 								min: 0,
-								max: maxHeightFFT
+								max: maxHeightFFT,
 							},
 							toRange: {
 								min: 0,
-								max: MAX_HEIGHT - this.VOXEL_SIZE
-							}
+								max: MAX_HEIGHT - this.VOXEL_SIZE,
+							},
 						})
 					}
 
@@ -424,7 +480,7 @@ export class FFT3DPointGrid extends Renderer {
 	 * Process Keyboard Input
 	 * @param dt
 	 */
-	private processKeyInput (dt: number) {
+	private processKeyInput(dt: number) {
 		if (!this.camera) {
 			return
 		}
@@ -447,7 +503,7 @@ export class FFT3DPointGrid extends Renderer {
 	}
 
 	/* Event Handlers */
-	private onMouseInput (ev: MouseEvent) {
+	private onMouseInput(ev: MouseEvent) {
 		if (!this.camera) {
 			return
 		}
@@ -455,15 +511,15 @@ export class FFT3DPointGrid extends Renderer {
 		this.camera.turnAround(ev.movementX, ev.movementY)
 	}
 
-	private onKeyboardUp (ev: KeyboardEvent) {
+	private onKeyboardUp(ev: KeyboardEvent) {
 		this.keysMap[ev.code] = false
 	}
 
-	private onKeyboardDown (ev: KeyboardEvent) {
+	private onKeyboardDown(ev: KeyboardEvent) {
 		this.keysMap[ev.code] = true
 	}
 
-	private async onCanvasClick () {
+	private async onCanvasClick() {
 		await this.canvas.requestPointerLock()
 	}
 }

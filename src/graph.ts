@@ -1,24 +1,29 @@
-import { CONSTANTS } from "./constants/constants";
+import { CONSTANTS } from './constants/constants'
 
 /* Renderers */
-import { FFT2D } from "./renderers/fft-2d";
-import { FFT3D } from "./renderers/fft-3d";
-import { FFT3DPointGrid } from "./renderers/fft-3d-point-grid";
-import { Renderer } from "./renderers/renderer";
+import { FFT2D } from './renderers/fft-2d'
+import { FFT3D } from './renderers/fft-3d'
+import { FFT3DPointGrid } from './renderers/fft-3d-point-grid'
+import { Renderer } from './renderers/renderer'
 
 /* Audio Files */
 import ValseOp69No1 from './assets/audios/valse_op69_no_1.mp3'
 import IllAlwaysRemember from './assets/audios/illalwaysremember.mp3'
 import Menuet from './assets/audios/menuet.mp3'
 
-import { FileUtils, UIUtils } from "./utils/utils";
+import { FileUtils, UIUtils } from './utils/utils'
 
-export type GraphOptions = 'source' | 'cameraMovement' | 'graph' | 'webworker' | 'soundtrack'
+export type GraphOptions =
+	| 'source'
+	| 'cameraMovement'
+	| 'graph'
+	| 'webworker'
+	| 'soundtrack'
 
 export const GRAPH_OPS = {
 	FFT3D: 'fft-3d',
 	FFT2D: 'fft-2d',
-	FFT3D_POINTGRID: 'fft-3d-point-grid'
+	FFT3D_POINTGRID: 'fft-3d-point-grid',
 }
 
 export const SOURCE_OPS = {
@@ -29,7 +34,7 @@ export const SOURCE_OPS = {
 
 export const CAMERA_MOVEMENT_OPS = {
 	LOCK: 'lock',
-	FREE: 'free'
+	FREE: 'free',
 }
 
 export const SOUNDTRACKS = {
@@ -74,7 +79,7 @@ export class Graph {
 
 	private soundConnections = {
 		mic: false,
-		audio: false
+		audio: false,
 	}
 
 	private options: Record<GraphOptions, string | boolean> = {
@@ -82,7 +87,7 @@ export class Graph {
 		cameraMovement: 'lock',
 		graph: '3d',
 		webworker: false,
-		soundtrack: SOUNDTRACKS.ILL_ALWAYS_REMEMBER
+		soundtrack: SOUNDTRACKS.ILL_ALWAYS_REMEMBER,
 	}
 
 	/* Graph Renderers */
@@ -92,15 +97,16 @@ export class Graph {
 
 	private audioStartedAt = 0
 
-	constructor(
-		canvasId: string,
-		canvasContainerId: string
-	) {
+	constructor(canvasId: string, canvasContainerId: string) {
 		this.canvas = document.getElementById(canvasId) as HTMLCanvasElement
-		this.canvasContainer = document.getElementById(canvasContainerId) as HTMLDivElement
+		this.canvasContainer = document.getElementById(
+			canvasContainerId,
+		) as HTMLDivElement
 
 		this.trackbar = document.getElementById(CONSTANTS.DOM_ELEMENTS.TRACKBAR_ID)
-		this.trackball = document.getElementById(CONSTANTS.DOM_ELEMENTS.TRACKBAR_BALL_ID)
+		this.trackball = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.TRACKBAR_BALL_ID,
+		)
 
 		if (!this.canvas || !this.canvasContainer) {
 			throw new Error('Canvas Or Container is null')
@@ -114,18 +120,18 @@ export class Graph {
 		this.renderers = {
 			[CONSTANTS.RENDERERS.NAMES.FFT2D]: new FFT2D(this.canvas),
 			[CONSTANTS.RENDERERS.NAMES.FFT3D]: new FFT3D(this.canvas),
-			[CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID]: new FFT3DPointGrid(this.canvas)
+			[CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID]: new FFT3DPointGrid(this.canvas),
 		}
 	}
 
-	public async init () {
+	public async init() {
 		if (this.isInitialized) {
 			console.warn('Graph has been initialized')
 			return
 		}
 
 		// Init analyser node
-		await this.initAnalyser();
+		await this.initAnalyser()
 
 		/* Initialize Renderers */
 		// this.initRenderers()
@@ -133,7 +139,7 @@ export class Graph {
 		this.isInitialized = true
 	}
 
-	private async initAnalyser () {
+	private async initAnalyser() {
 		const analyser = this.audioContext.createAnalyser()
 
 		analyser.fftSize = this.FFT_SIZE
@@ -150,11 +156,11 @@ export class Graph {
 	// 	}
 	// }
 
-	public setOption (key: GraphOptions, value: string | boolean) {
+	public setOption(key: GraphOptions, value: string | boolean) {
 		this.options[key] = value
 	}
 
-	public run () {
+	public run() {
 		const fpsText = document.getElementById(CONSTANTS.DOM_ELEMENTS.FPS_TEXT_ID)
 
 		/* Keep track of time */
@@ -186,7 +192,7 @@ export class Graph {
 		requestAnimationFrame(draw)
 	}
 
-	private update (dt: number) {
+	private update(dt: number) {
 		if (!this.currentAudioSource) {
 			// no source connected
 			return
@@ -201,8 +207,11 @@ export class Graph {
 		}
 	}
 
-	private async render (dt: number) {
-		if (this.currentAudioSource === 'soundtrack' || this.currentAudioSource === 'file') {
+	private async render(dt: number) {
+		if (
+			this.currentAudioSource === 'soundtrack' ||
+			this.currentAudioSource === 'file'
+		) {
 			// update trackbar
 			this.renderTrackbar()
 		} else {
@@ -214,12 +223,14 @@ export class Graph {
 		}
 	}
 
-	private renderTrackbar () {
+	private renderTrackbar() {
 		if (!this.audioContext || !this.soundtrack || !this.soundtrack.buffer) {
 			return
 		}
 
-		const currentTime = (this.audioContext.currentTime - this.audioStartedAt) * this.soundtrack.playbackRate.value
+		const currentTime =
+			(this.audioContext.currentTime - this.audioStartedAt) *
+			this.soundtrack.playbackRate.value
 
 		const percentage = currentTime / this.soundtrack.buffer.duration
 
@@ -228,7 +239,7 @@ export class Graph {
 		this.setTrackbarPercentage(percentage)
 	}
 
-	private toggleShowTrackbar (show: boolean) {
+	private toggleShowTrackbar(show: boolean) {
 		if (this.trackbar) {
 			if (show) {
 				this.trackbar.classList.remove('d-none')
@@ -238,7 +249,7 @@ export class Graph {
 		}
 	}
 
-	private setTrackbarPercentage (percentage: number) {
+	private setTrackbarPercentage(percentage: number) {
 		if (this.trackball && this.trackbar) {
 			const x = (this.trackbar.clientWidth - 10) * percentage
 
@@ -246,14 +257,14 @@ export class Graph {
 		}
 	}
 
-	private setStateBaseOnOptions () {
+	private setStateBaseOnOptions() {
 		this.setSource()
 		this.setActiveRenderer()
 		this.setCameraMovement()
 		this.setUseWorker()
 	}
 
-	private setActiveRenderer () {
+	private setActiveRenderer() {
 		let renderName: string
 
 		switch (this.options.graph) {
@@ -314,7 +325,7 @@ export class Graph {
 		}
 	}
 
-	private setUseWorker () {
+	private setUseWorker() {
 		if (!this.activeRenderer) {
 			return
 		}
@@ -326,7 +337,7 @@ export class Graph {
 	private setSource() {
 		if (this.options.source === 'file') {
 			// Will be called when file is arrive
-			return;
+			return
 		}
 
 		if (this.currentAudioSource === 'mic' && this.options.source === 'mic') {
@@ -334,7 +345,10 @@ export class Graph {
 			return
 		}
 
-		if (this.currentAudioSource === 'soundtrack' && this.options.source === 'soundtrack') {
+		if (
+			this.currentAudioSource === 'soundtrack' &&
+			this.options.source === 'soundtrack'
+		) {
 			if (this.currentSoundtrack === this.options.soundtrack) {
 				// soundtrack is already set
 				return
@@ -343,7 +357,7 @@ export class Graph {
 
 		if (this.audioSourceStatus === 'loading') {
 			// already being loaded
-			return;
+			return
 		}
 
 		let connectSourcePromise: Promise<boolean>
@@ -354,7 +368,9 @@ export class Graph {
 
 		switch (this.options.source) {
 			case SOURCE_OPS.SOUNDTRACK:
-				connectSourcePromise = this.connectToSoundtrack(this.options.soundtrack as string)
+				connectSourcePromise = this.connectToSoundtrack(
+					this.options.soundtrack as string,
+				)
 			case SOURCE_OPS.MIC:
 			default:
 				connectSourcePromise = this.connectMicrophone()
@@ -379,11 +395,20 @@ export class Graph {
 						UIUtils.setSubHeaderText('From mic', 'microphone-recording')
 					} else {
 						if (this.currentSoundtrack === SOUNDTRACKS.ILL_ALWAYS_REMEMBER) {
-							UIUtils.setSubHeaderText("Now playing <a href='https://www.youtube.com/watch?v=ZJLngfJH-rQ' target='_blank' rel='noopener noreferrer'>I'll Always Remember - Toshifumi Hinata</a>", 'soundtrack-playing')
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=ZJLngfJH-rQ' target='_blank' rel='noopener noreferrer'>I'll Always Remember - Toshifumi Hinata</a>",
+								'soundtrack-playing',
+							)
 						} else if (this.currentSoundtrack === SOUNDTRACKS.VALSE_OP_69_N1) {
-							UIUtils.setSubHeaderText("Now playing <a href='https://www.youtube.com/watch?v=_SSkoMLobII&list=RD_SSkoMLobII&start_radio=1' target='_blank' rel='noopener noreferrer'>Chopin - Valse de l'adieu, op. 69 no. 1</a>", 'soundtrack-playing')
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=_SSkoMLobII&list=RD_SSkoMLobII&start_radio=1' target='_blank' rel='noopener noreferrer'>Chopin - Valse de l'adieu, op. 69 no. 1</a>",
+								'soundtrack-playing',
+							)
 						} else if (this.currentSoundtrack === SOUNDTRACKS.MENUET) {
-							UIUtils.setSubHeaderText("Now playing <a href='https://www.youtube.com/watch?v=oSkkddfHaP4' target='_blank' rel='noopener noreferrer'>Menuet - Toshifumi Hinata</a>", 'soundtrack-playing')
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=oSkkddfHaP4' target='_blank' rel='noopener noreferrer'>Menuet - Toshifumi Hinata</a>",
+								'soundtrack-playing',
+							)
 						}
 					}
 				}, 1500)
@@ -395,13 +420,16 @@ export class Graph {
 	}
 
 	/* Source Functions */
-	private async connectMicrophone () {
+	private async connectMicrophone() {
 		if (!this.analyser) {
 			throw new Error('No analyser was found!')
 		}
 
 		if (!navigator.mediaDevices.getUserMedia) {
-			UIUtils.setSubHeaderText('Your browser does not support microphone or the app does not have recording permission', 'error')
+			UIUtils.setSubHeaderText(
+				'Your browser does not support microphone or the app does not have recording permission',
+				'error',
+			)
 			return false
 		}
 
@@ -429,13 +457,16 @@ export class Graph {
 
 			return true
 		} catch {
-			UIUtils.setSubHeaderText('Your browser does not support microphone or the app does not have recording permission', 'error')
+			UIUtils.setSubHeaderText(
+				'Your browser does not support microphone or the app does not have recording permission',
+				'error',
+			)
 		}
 
 		return false
 	}
 
-	private disconnectMirophone () {
+	private disconnectMirophone() {
 		if (this.soundConnections.mic) {
 			if (!this.analyser) {
 				throw new Error('No analyser was found!')
@@ -463,7 +494,7 @@ export class Graph {
 		}
 	}
 
-	private async connectToSoundtrack (name: string): Promise<boolean> {
+	private async connectToSoundtrack(name: string): Promise<boolean> {
 		if (!this.analyser) {
 			throw new Error('No analyser was found!')
 		}
@@ -494,7 +525,7 @@ export class Graph {
 
 			request.open('GET', url, true)
 
-			request.responseType = "arraybuffer";
+			request.responseType = 'arraybuffer'
 
 			request.onload = async () => {
 				if (!this.analyser) {
@@ -525,7 +556,10 @@ export class Graph {
 			}
 
 			request.onerror = () => {
-				UIUtils.setSubHeaderText('Unable to request audio file. Please check your internet connection', 'error')
+				UIUtils.setSubHeaderText(
+					'Unable to request audio file. Please check your internet connection',
+					'error',
+				)
 
 				reject(false)
 			}
@@ -534,7 +568,7 @@ export class Graph {
 		})
 	}
 
-	private disconnectAudioSource () {
+	private disconnectAudioSource() {
 		if (this.soundConnections.audio) {
 			if (!this.analyser) {
 				throw new Error('No analyser was found!')
@@ -545,7 +579,9 @@ export class Graph {
 			}
 
 			if (!this.soundtrack) {
-				throw new Error('There is no soundtrack source. You may forgot to initialize it')
+				throw new Error(
+					'There is no soundtrack source. You may forgot to initialize it',
+				)
 			}
 
 			this.soundtrack.stop()
@@ -562,7 +598,7 @@ export class Graph {
 		}
 	}
 
-	public async setSourceFromFile (file: File) {
+	public async setSourceFromFile(file: File) {
 		if (!this.audioContext) {
 			throw new Error('No audio context')
 		}
@@ -609,7 +645,7 @@ export class Graph {
 		}
 	}
 
-	private updateSource () {
+	private updateSource() {
 		if (this.analyser) {
 			// In case I forget
 			if (this.dataArray.length < this.analyser.frequencyBinCount) {
@@ -623,7 +659,7 @@ export class Graph {
 		}
 	}
 
-	private clearData () {
+	private clearData() {
 		// clear the data buffer
 
 		// DON'T CREATING A NEW BUFFER

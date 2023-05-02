@@ -1,17 +1,17 @@
 /* Constants */
-import { EdgeVertexIndices, TriangleTable } from "../constants/lookup-table";
-import { CONSTANTS } from "../constants/constants";
+import { EdgeVertexIndices, TriangleTable } from '../constants/lookup-table'
+import { CONSTANTS } from '../constants/constants'
 
 /* Utils */
-import { max, min } from "lodash";
-import { NumberUtils } from "../utils/utils";
-import { glMatrix, mat4, vec3, vec4 } from "gl-matrix";
+import { max, min } from 'lodash'
+import { NumberUtils } from '../utils/utils'
+import { glMatrix, mat4, vec3, vec4 } from 'gl-matrix'
 
 /* WebGL */
-import { Shader } from "../webgl/shader";
-import { ShaderProgram } from "../webgl/shader-program";
-import { Renderer } from "./renderer";
-import { Camera } from "../webgl/camera";
+import { Shader } from '../webgl/shader'
+import { ShaderProgram } from '../webgl/shader-program'
+import { Renderer } from './renderer'
+import { Camera } from '../webgl/camera'
 
 /* Worker */
 import Worker from '../workers/fft-3d.worker?worker'
@@ -25,6 +25,7 @@ export class FFT3D extends Renderer {
 
 	private keysMap: Record<string, boolean> = {}
 
+	// eslint-disable-next-line @typescript-eslint/ban-types
 	private uniformSetters: Record<string, Function> = {}
 
 	private positionAttributeLocation = -1
@@ -86,7 +87,10 @@ export class FFT3D extends Renderer {
 		}
 
 		if (!this.isWebGLSupported) {
-			this.log('error', 'No WebGL2 Rendering Context found! Your browser may not support WebGL2')
+			this.log(
+				'error',
+				'No WebGL2 Rendering Context found! Your browser may not support WebGL2',
+			)
 
 			// Since Marching Cube is solely based on WebGL2
 			// If there is no webgl2 available, then don't initialize it
@@ -110,35 +114,48 @@ export class FFT3D extends Renderer {
 		this.log('log', 'Initialized')
 	}
 
-	private initCamera () {
+	private initCamera() {
 		this.camera = new Camera()
 
-		this.camera.positionText = document.getElementById(CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_POS_SPAN_ID)
-		this.camera.rotationText = document.getElementById(CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_ROT_SPAN_ID)
+		this.camera.positionText = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_POS_SPAN_ID,
+		)
+		this.camera.rotationText = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CAMERA_DEBUG_ROT_SPAN_ID,
+		)
 
 		this.camera.setSpecular(
 			CONSTANTS.CAMERA.FFT3D.SPECULAR_POS,
-			CONSTANTS.CAMERA.FFT3D.SPECULAR_ROT
+			CONSTANTS.CAMERA.FFT3D.SPECULAR_ROT,
 		)
 
 		this.camera.lockCamera()
 	}
 
-	private initWebGL () {
+	private initWebGL() {
 		const gl = this.gl
 
 		if (!gl) {
-			this.log('error', 'No WebGL2 Rendering Context found! Your browser may not support WebGL2')
+			this.log(
+				'error',
+				'No WebGL2 Rendering Context found! Your browser may not support WebGL2',
+			)
 			return
 		}
 
 		// Set GL viewport
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
 
 		// Create Shaders
-		const vertexShader = Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT3D.VERTEX_SCRIPT_ID)
+		const vertexShader = Shader.fromScript(
+			gl,
+			CONSTANTS.SHADER_SCRIPTS.FFT3D.VERTEX_SCRIPT_ID,
+		)
 
-		const fragmentShader =  Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT3D.FRAGMENT_SCRIPT_ID)
+		const fragmentShader = Shader.fromScript(
+			gl,
+			CONSTANTS.SHADER_SCRIPTS.FFT3D.FRAGMENT_SCRIPT_ID,
+		)
 
 		// Create Shader Program
 		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
@@ -153,15 +170,28 @@ export class FFT3D extends Renderer {
 		// Calculating aspect by canvas.width / canvas.height is not recommended since CSS may influenced the size
 		// Should use canvas.clientWidth and canvas.clientHeight since those are constants and not influeced by CSS
 		shaderProgram.setUniforms(this.uniformSetters, {
-			'projection': mat4.perspective(mat4.create(), glMatrix.toRadian(45.0), (gl.canvas as HTMLCanvasElement).clientWidth / (gl.canvas as HTMLCanvasElement).clientHeight, 0.1, 300),
-			'lightPos': [0.5, 0.7, 1],
-			'maxHeight': this.DIMENSIONS[1] * this.VOXEL_SIZE,
+			projection: mat4.perspective(
+				mat4.create(),
+				glMatrix.toRadian(45.0),
+				(gl.canvas as HTMLCanvasElement).clientWidth /
+					(gl.canvas as HTMLCanvasElement).clientHeight,
+				0.1,
+				300,
+			),
+			lightPos: [0.5, 0.7, 1],
+			maxHeight: this.DIMENSIONS[1] * this.VOXEL_SIZE,
 		})
 
 		// Save attribute locations
-		this.positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
+		this.positionAttributeLocation = gl.getAttribLocation(
+			shaderProgram.program,
+			'a_position',
+		)
 
-		this.normalAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_normal')
+		this.normalAttributeLocation = gl.getAttribLocation(
+			shaderProgram.program,
+			'a_normal',
+		)
 
 		// Create VAO and Array Buffers
 		this.VAO = gl.createVertexArray()
@@ -185,13 +215,13 @@ export class FFT3D extends Renderer {
 
 		// Turn on culling. By default backfacing triangles
 		// will be culled.
-		gl.enable(gl.CULL_FACE);
+		gl.enable(gl.CULL_FACE)
 
 		// Enable the depth buffer
-		gl.enable(gl.DEPTH_TEST);
+		gl.enable(gl.DEPTH_TEST)
 	}
 
-	private initData () {
+	private initData() {
 		// Initialize vertices data array
 		// Each data is a vec4 contains x, y, z coordinate of the point and density value as 0
 		// call z -> y -> z is COLUMN-MAJOR order
@@ -199,14 +229,19 @@ export class FFT3D extends Renderer {
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
 					this.data.push(
-						vec4.fromValues(x * this.VOXEL_SIZE, y * this.VOXEL_SIZE, z * this.VOXEL_SIZE, 0)
+						vec4.fromValues(
+							x * this.VOXEL_SIZE,
+							y * this.VOXEL_SIZE,
+							z * this.VOXEL_SIZE,
+							0,
+						),
 					)
 				}
 			}
 		}
 	}
 
-	private initEvents () {
+	private initEvents() {
 		document.addEventListener('keydown', this.onKeyboardDown.bind(this))
 
 		document.addEventListener('keyup', this.onKeyboardUp.bind(this))
@@ -216,12 +251,12 @@ export class FFT3D extends Renderer {
 		this.canvas.addEventListener('click', this.onCanvasClick.bind(this))
 	}
 
-	private initWorker () {
+	private initWorker() {
 		// Check if browser support web worker
 		if (window.Worker) {
 			this.worker = new Worker()
 
-			this.worker.onmessage = (ev: MessageEvent<any>) => {
+			this.worker.onmessage = (ev: MessageEvent<unknown>) => {
 				this.receiveDataFromWorker(ev.data)
 			}
 
@@ -248,7 +283,7 @@ export class FFT3D extends Renderer {
 				this.shaderProgram.use()
 
 				this.shaderProgram.setUniforms(this.uniformSetters, {
-					'view': this.camera.getViewMatrix()
+					view: this.camera.getViewMatrix(),
 				})
 
 				// Unbind program
@@ -291,7 +326,7 @@ export class FFT3D extends Renderer {
 		super.clear()
 	}
 
-	private clearData () {
+	private clearData() {
 		this.ffts = []
 		this.vertices = []
 		this.data = []
@@ -299,7 +334,7 @@ export class FFT3D extends Renderer {
 		this.v2 = []
 	}
 
-	private clearWebGL () {
+	private clearWebGL() {
 		const gl = this.gl
 
 		if (gl) {
@@ -330,7 +365,7 @@ export class FFT3D extends Renderer {
 		}
 	}
 
-	private clearEvents () {
+	private clearEvents() {
 		document.removeEventListener('keydown', this.onKeyboardDown)
 
 		document.removeEventListener('keyup', this.onKeyboardUp)
@@ -348,6 +383,7 @@ export class FFT3D extends Renderer {
 		}
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private renderMarchingCubes(_: number) {
 		const gl = this.gl
 
@@ -392,7 +428,11 @@ export class FFT3D extends Renderer {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
 		// Fetch data into buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW)
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array(this.vertices),
+			gl.DYNAMIC_DRAW,
+		)
 
 		// Fetch data into position attribute from the buffer
 		// Enable the attribute in the shader program
@@ -406,13 +446,27 @@ export class FFT3D extends Renderer {
 		let offset = 0
 
 		// Fetch instruction to Shader Program
-		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
+		gl.vertexAttribPointer(
+			this.positionAttributeLocation,
+			size,
+			type,
+			normalize,
+			stride,
+			offset,
+		)
 
 		gl.enableVertexAttribArray(this.normalAttributeLocation)
 
 		offset = 12
 
-		gl.vertexAttribPointer(this.normalAttributeLocation, size, type, normalize, stride, offset)
+		gl.vertexAttribPointer(
+			this.normalAttributeLocation,
+			size,
+			type,
+			normalize,
+			stride,
+			offset,
+		)
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
@@ -438,7 +492,7 @@ export class FFT3D extends Renderer {
 		// console.log(`minx: ${this.minX} | minz: ${this.minZ} | maxx: ${this.maxX} | maxz: ${this.maxZ}`)
 	}
 
-	private triangulate () {
+	private triangulate() {
 		let cube: vec4[] = []
 
 		let index: number
@@ -462,7 +516,7 @@ export class FFT3D extends Renderer {
 							x + (i & 1), // access the least significant bit
 							y + ((i >> 1) & 1), // shift right and access the least significant bit
 							z + ((i >> 2) & 1), // shift right two times and access the least significant bit
-							this.DIMENSIONS
+							this.DIMENSIONS,
 						)
 
 						cube.push(this.data[index])
@@ -496,7 +550,7 @@ export class FFT3D extends Renderer {
 		let edgeIndex: number
 		let i1: number, i2: number
 
-		let vertexPos: vec3[] = []
+		const vertexPos: vec3[] = []
 
 		for (let i = 0; i < triangulation.length - 1; ++i) {
 			edgeIndex = triangulation[i]
@@ -521,16 +575,19 @@ export class FFT3D extends Renderer {
 	private vertexInterp(p1: vec4, p2: vec4, iso?: number) {
 		const isoLevel = iso ?? this.ISO_LEVEL
 
-		if (Math.abs(isoLevel - p1[3]) < Number.EPSILON) return vec3.fromValues(p1[0], p1[1], p1[2])
-		if (Math.abs(isoLevel - p2[3]) < Number.EPSILON) return vec3.fromValues(p2[0], p2[1], p2[2])
-		if (Math.abs(p2[3] - p1[3]) < Number.EPSILON || (p2[3] === 0 && p1[3] === 0)) return vec3.fromValues(p1[0], p1[1], p1[2])
+		if (Math.abs(isoLevel - p1[3]) < Number.EPSILON)
+			return vec3.fromValues(p1[0], p1[1], p1[2])
+		if (Math.abs(isoLevel - p2[3]) < Number.EPSILON)
+			return vec3.fromValues(p2[0], p2[1], p2[2])
+		if (Math.abs(p2[3] - p1[3]) < Number.EPSILON || (p2[3] === 0 && p1[3] === 0))
+			return vec3.fromValues(p1[0], p1[1], p1[2])
 
 		const mu = (isoLevel - p1[3]) / (p2[3] - p1[3])
 
 		const p: vec3 = vec3.fromValues(
 			p1[0] + mu * (p2[0] - p1[0]),
 			p1[1] + mu * (p2[1] - p1[1]),
-			p1[2] + mu * (p2[2] - p1[2])
+			p1[2] + mu * (p2[2] - p1[2]),
 		)
 
 		return p
@@ -558,13 +615,28 @@ export class FFT3D extends Renderer {
 		this.maxZ = max([this.maxZ, p1[2], p2[2], p3[2]]) ?? Number.NEGATIVE_INFINITY
 
 		this.vertices.push(
-			p1[0], p1[1], p1[2], normal[0], normal[1], normal[2],
-			p2[0], p2[1], p2[2], normal[0], normal[1], normal[2],
-			p3[0], p3[1], p3[2], normal[0], normal[1], normal[2],
+			p1[0],
+			p1[1],
+			p1[2],
+			normal[0],
+			normal[1],
+			normal[2],
+			p2[0],
+			p2[1],
+			p2[2],
+			normal[0],
+			normal[1],
+			normal[2],
+			p3[0],
+			p3[1],
+			p3[2],
+			normal[0],
+			normal[1],
+			normal[2],
 		)
 	}
 
-	private updateFFT () {
+	private updateFFT() {
 		if (!this.dataSource) {
 			return
 		}
@@ -589,7 +661,7 @@ export class FFT3D extends Renderer {
 		this.ffts.push(clone)
 	}
 
-	private updateData () {
+	private updateData() {
 		// If FFT data is empty, then nothing to do here
 		if (this.ffts.length === 0) return
 
@@ -635,12 +707,12 @@ export class FFT3D extends Renderer {
 							value: fft[x],
 							fromRange: {
 								min: 0,
-								max: maxHeightFFT
+								max: maxHeightFFT,
 							},
 							toRange: {
 								min: 0,
-								max: MAX_HEIGHT - this.VOXEL_SIZE
-							}
+								max: MAX_HEIGHT - this.VOXEL_SIZE,
+							},
 						})
 					}
 
@@ -657,7 +729,7 @@ export class FFT3D extends Renderer {
 		}
 	}
 
-	private transferDataToWorker (bufferIndex: number) {
+	private transferDataToWorker(bufferIndex: number) {
 		if (!this.worker) {
 			throw new Error('Worker has not been initialized!')
 		}
@@ -670,14 +742,18 @@ export class FFT3D extends Renderer {
 
 		clone.set(this.dataSource)
 
-		this.worker.postMessage({
-			type: CONSTANTS.WORKER.SOURCE_FROM_MAIN_THREAD,
-			data: clone.buffer,
-			bufferIndex
-		}, [clone.buffer])
+		this.worker.postMessage(
+			{
+				type: CONSTANTS.WORKER.SOURCE_FROM_MAIN_THREAD,
+				data: clone.buffer,
+				bufferIndex,
+			},
+			[clone.buffer],
+		)
 	}
 
-	private receiveDataFromWorker (msg: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private receiveDataFromWorker(msg: any) {
 		const { type, data, bufferIndex } = msg
 
 		if (!type || !data) {
@@ -710,7 +786,7 @@ export class FFT3D extends Renderer {
 		}
 	}
 
-	private writeBufferToVertices (buffer: ArrayBuffer) {
+	private writeBufferToVertices(buffer: ArrayBuffer) {
 		// make sure the vertices data is clear
 		const vertices = []
 
@@ -734,7 +810,7 @@ export class FFT3D extends Renderer {
 	 * Process Keyboard Input
 	 * @param dt
 	 */
-	private processKeyInput (dt: number) {
+	private processKeyInput(dt: number) {
 		if (!this.camera) {
 			return
 		}
@@ -757,7 +833,7 @@ export class FFT3D extends Renderer {
 	}
 
 	/* Event Handlers */
-	private onMouseInput (ev: MouseEvent) {
+	private onMouseInput(ev: MouseEvent) {
 		if (!this.camera) {
 			return
 		}
@@ -765,15 +841,15 @@ export class FFT3D extends Renderer {
 		this.camera.turnAround(ev.movementX, ev.movementY)
 	}
 
-	private onKeyboardUp (ev: KeyboardEvent) {
+	private onKeyboardUp(ev: KeyboardEvent) {
 		this.keysMap[ev.code] = false
 	}
 
-	private onKeyboardDown (ev: KeyboardEvent) {
+	private onKeyboardDown(ev: KeyboardEvent) {
 		this.keysMap[ev.code] = true
 	}
 
-	private async onCanvasClick () {
+	private async onCanvasClick() {
 		await this.canvas.requestPointerLock()
 	}
 }

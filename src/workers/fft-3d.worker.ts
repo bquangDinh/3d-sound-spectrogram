@@ -1,8 +1,8 @@
-import { vec3, vec4 } from "gl-matrix"
-import { CONSTANTS } from "../constants/constants"
-import { max, min } from "lodash"
-import { NumberUtils } from "../utils/utils"
-import { EdgeVertexIndices, TriangleTable } from "../constants/lookup-table"
+import { vec3, vec4 } from 'gl-matrix'
+import { CONSTANTS } from '../constants/constants'
+import { max, min } from 'lodash'
+import { NumberUtils } from '../utils/utils'
+import { EdgeVertexIndices, TriangleTable } from '../constants/lookup-table'
 
 class TriangulateFFT {
 	ffts: Uint8Array[] = []
@@ -33,14 +33,19 @@ class TriangulateFFT {
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
 					this.data.push(
-						vec4.fromValues(x * this.VOXEL_SIZE, y * this.VOXEL_SIZE, z * this.VOXEL_SIZE, 0)
+						vec4.fromValues(
+							x * this.VOXEL_SIZE,
+							y * this.VOXEL_SIZE,
+							z * this.VOXEL_SIZE,
+							0,
+						),
 					)
 				}
 			}
 		}
 	}
 
-	public addFFT (buffer: ArrayBuffer) {
+	public addFFT(buffer: ArrayBuffer) {
 		// If the array is full, then throw the old one
 		if (this.ffts.length > this.DIMENSIONS[2]) {
 			this.ffts.shift()
@@ -67,13 +72,13 @@ class TriangulateFFT {
 		this.ffts.push(fft)
 	}
 
-	public update () {
+	public update() {
 		this.updateData()
 
 		this.triangulate()
 	}
 
-	public writeToBuffer (): ArrayBuffer {
+	public writeToBuffer(): ArrayBuffer {
 		const buffer = new ArrayBuffer(this.vertices.length * 4)
 
 		const dataView = new DataView(buffer)
@@ -85,7 +90,7 @@ class TriangulateFFT {
 		return buffer
 	}
 
-	private updateData () {
+	private updateData() {
 		// If FFT data is empty, then nothing to do here
 		if (this.ffts.length === 0) return
 
@@ -131,12 +136,12 @@ class TriangulateFFT {
 							value: fft[x],
 							fromRange: {
 								min: 0,
-								max: maxHeightFFT
+								max: maxHeightFFT,
 							},
 							toRange: {
 								min: 0,
-								max: MAX_HEIGHT - this.VOXEL_SIZE
-							}
+								max: MAX_HEIGHT - this.VOXEL_SIZE,
+							},
 						})
 					}
 
@@ -153,7 +158,7 @@ class TriangulateFFT {
 		}
 	}
 
-	private triangulate () {
+	private triangulate() {
 		this.vertices = []
 
 		this.minX = Number.POSITIVE_INFINITY
@@ -187,7 +192,7 @@ class TriangulateFFT {
 							x + (i & 1), // access the least significant bit
 							y + ((i >> 1) & 1), // shift right and access the least significant bit
 							z + ((i >> 2) & 1), // shift right two times and access the least significant bit
-							this.DIMENSIONS
+							this.DIMENSIONS,
 						)
 
 						cube.push(this.data[index])
@@ -221,7 +226,7 @@ class TriangulateFFT {
 		let edgeIndex: number
 		let i1: number, i2: number
 
-		let vertexPos: vec3[] = []
+		const vertexPos: vec3[] = []
 
 		for (let i = 0; i < triangulation.length - 1; ++i) {
 			edgeIndex = triangulation[i]
@@ -246,16 +251,19 @@ class TriangulateFFT {
 	private vertexInterp(p1: vec4, p2: vec4, iso?: number) {
 		const isoLevel = iso ?? this.ISO_LEVEL
 
-		if (Math.abs(isoLevel - p1[3]) < Number.EPSILON) return vec3.fromValues(p1[0], p1[1], p1[2])
-		if (Math.abs(isoLevel - p2[3]) < Number.EPSILON) return vec3.fromValues(p2[0], p2[1], p2[2])
-		if (Math.abs(p2[3] - p1[3]) < Number.EPSILON || (p2[3] === 0 && p1[3] === 0)) return vec3.fromValues(p1[0], p1[1], p1[2])
+		if (Math.abs(isoLevel - p1[3]) < Number.EPSILON)
+			return vec3.fromValues(p1[0], p1[1], p1[2])
+		if (Math.abs(isoLevel - p2[3]) < Number.EPSILON)
+			return vec3.fromValues(p2[0], p2[1], p2[2])
+		if (Math.abs(p2[3] - p1[3]) < Number.EPSILON || (p2[3] === 0 && p1[3] === 0))
+			return vec3.fromValues(p1[0], p1[1], p1[2])
 
 		const mu = (isoLevel - p1[3]) / (p2[3] - p1[3])
 
 		const p: vec3 = vec3.fromValues(
 			p1[0] + mu * (p2[0] - p1[0]),
 			p1[1] + mu * (p2[1] - p1[1]),
-			p1[2] + mu * (p2[2] - p1[2])
+			p1[2] + mu * (p2[2] - p1[2]),
 		)
 
 		return p
@@ -283,15 +291,31 @@ class TriangulateFFT {
 		this.maxZ = max([this.maxZ, p1[2], p2[2], p3[2]]) ?? Number.NEGATIVE_INFINITY
 
 		this.vertices.push(
-			p1[0], p1[1], p1[2], normal[0], normal[1], normal[2],
-			p2[0], p2[1], p2[2], normal[0], normal[1], normal[2],
-			p3[0], p3[1], p3[2], normal[0], normal[1], normal[2],
+			p1[0],
+			p1[1],
+			p1[2],
+			normal[0],
+			normal[1],
+			normal[2],
+			p2[0],
+			p2[1],
+			p2[2],
+			normal[0],
+			normal[1],
+			normal[2],
+			p3[0],
+			p3[1],
+			p3[2],
+			normal[0],
+			normal[1],
+			normal[2],
 		)
 	}
 }
 
 const runner = new TriangulateFFT()
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ctx: Worker = self as any
 
 ctx.addEventListener('message', (e) => {
@@ -312,19 +336,22 @@ ctx.addEventListener('message', (e) => {
 			// Send data back to main thread
 			const result = runner.writeToBuffer()
 
-			ctx.postMessage({
-				type: CONSTANTS.WORKER.RESULT_FROM_WORKER,
-				data: result,
-				min: {
-					x: runner.minX,
-					z: runner.minZ
+			ctx.postMessage(
+				{
+					type: CONSTANTS.WORKER.RESULT_FROM_WORKER,
+					data: result,
+					min: {
+						x: runner.minX,
+						z: runner.minZ,
+					},
+					max: {
+						x: runner.maxX,
+						z: runner.maxZ,
+					},
+					bufferIndex,
 				},
-				max: {
-					x: runner.maxX,
-					z: runner.maxZ
-				},
-				bufferIndex,
-			}, [result])
+				[result],
+			)
 		}
 	}
 })

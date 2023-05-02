@@ -1,14 +1,22 @@
-import { Shader } from "./shader"
-import { mat2, mat3, mat4, vec2, vec3, vec4 } from "gl-matrix"
+import { Shader } from './shader'
+import { mat2, mat3, mat4, vec2, vec3, vec4 } from 'gl-matrix'
 
-export type AllowUniformTypes = number | number[] | vec2 | vec3 | vec4 | mat2 | mat3 | mat4
+export type AllowUniformTypes =
+	| number
+	| number[]
+	| vec2
+	| vec3
+	| vec4
+	| mat2
+	| mat3
+	| mat4
 
 export class ShaderProgram {
 	private _shaderProgram: WebGLProgram
 
 	constructor(
 		private gl: WebGL2RenderingContext,
-		shaders: WebGLShader[] | Shader[]
+		shaders: WebGLShader[] | Shader[],
 	) {
 		const program = gl.createProgram()
 
@@ -54,7 +62,7 @@ export class ShaderProgram {
 		}
 	}
 
-	get program() : WebGLProgram {
+	get program(): WebGLProgram {
 		return this._shaderProgram
 	}
 
@@ -75,9 +83,9 @@ export class ShaderProgram {
 	}
 
 	public setFloat(name: string, value: number) {
-		const location = this.gl.getUniformLocation(this.program, name);
+		const location = this.gl.getUniformLocation(this.program, name)
 
-		this.gl.uniform1f(location, value);
+		this.gl.uniform1f(location, value)
 	}
 
 	public setMatrix4(name: string, matrix: mat4) {
@@ -104,7 +112,8 @@ export class ShaderProgram {
 			const type = uniformInfo.type
 
 			// Check if this uniform is an array
-			const isArray = uniformInfo.size > 1 && uniformInfo.name.substring(-3) === '[0]'
+			const isArray =
+				uniformInfo.size > 1 && uniformInfo.name.substring(-3) === '[0]'
 
 			if (type === gl.FLOAT && isArray) {
 				return function (value: number[]) {
@@ -139,7 +148,7 @@ export class ShaderProgram {
 				}
 			}
 
-			if ((type === gl.INT) && isArray) {
+			if (type === gl.INT && isArray) {
 				return function (value: number[]) {
 					gl.uniform1iv(location, new Int32Array(value))
 				}
@@ -153,7 +162,7 @@ export class ShaderProgram {
 
 			if (type === gl.INT_VEC2) {
 				return function (value: vec2) {
-					gl.uniform2iv(location ,new Int32Array(value))
+					gl.uniform2iv(location, new Int32Array(value))
 				}
 			}
 
@@ -190,6 +199,7 @@ export class ShaderProgram {
 			throw new Error(`${uniformInfo} is not supported`)
 		}
 
+		// eslint-disable-next-line @typescript-eslint/ban-types
 		const uniformSetters: Record<string, Function> = {}
 
 		const numUniforms = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS)
@@ -216,7 +226,11 @@ export class ShaderProgram {
 		return uniformSetters
 	}
 
-	public setUniforms(setters: Record<string, Function>, values: Record<string, AllowUniformTypes>) {
+	public setUniforms(
+		// eslint-disable-next-line @typescript-eslint/ban-types
+		setters: Record<string, Function>,
+		values: Record<string, AllowUniformTypes>,
+	) {
 		Object.keys(values).forEach((name) => {
 			const setter = setters[name]
 

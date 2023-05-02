@@ -1,12 +1,16 @@
 export const SCRIPT_SHADER_TYPES = {
 	VERTEX_SHADER: 'x-shader/x-vertex',
-	FRAGMENT_SHADER: 'x-shader/x-fragment'
+	FRAGMENT_SHADER: 'x-shader/x-fragment',
 }
 
 export class Shader {
 	private _shader: WebGLShader
 
-	static fromScript(gl: WebGL2RenderingContext, scriptTagId: string, type?: number) {
+	static fromScript(
+		gl: WebGL2RenderingContext,
+		scriptTagId: string,
+		type?: number,
+	) {
 		const source = document.querySelector(`#${scriptTagId}`) as HTMLScriptElement
 
 		if (!source) {
@@ -20,9 +24,15 @@ export class Shader {
 		if (type) {
 			shaderType = type
 		} else {
-			if (source.type === SCRIPT_SHADER_TYPES.VERTEX_SHADER || source.getAttribute('type') === SCRIPT_SHADER_TYPES.VERTEX_SHADER) {
+			if (
+				source.type === SCRIPT_SHADER_TYPES.VERTEX_SHADER ||
+				source.getAttribute('type') === SCRIPT_SHADER_TYPES.VERTEX_SHADER
+			) {
 				shaderType = gl.VERTEX_SHADER
-			} else if (source.type === SCRIPT_SHADER_TYPES.FRAGMENT_SHADER || source.getAttribute('type') === SCRIPT_SHADER_TYPES.FRAGMENT_SHADER) {
+			} else if (
+				source.type === SCRIPT_SHADER_TYPES.FRAGMENT_SHADER ||
+				source.getAttribute('type') === SCRIPT_SHADER_TYPES.FRAGMENT_SHADER
+			) {
 				shaderType = gl.FRAGMENT_SHADER
 			} else {
 				throw new Error('Script shader type is not valid')
@@ -35,7 +45,7 @@ export class Shader {
 	constructor(
 		private gl: WebGL2RenderingContext,
 		source: string,
-		shaderType: number
+		shaderType: number,
 	) {
 		const shader = gl.createShader(shaderType)
 

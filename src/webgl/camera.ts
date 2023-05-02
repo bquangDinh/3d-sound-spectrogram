@@ -1,4 +1,4 @@
-import { glMatrix, mat4, vec3 } from "gl-matrix"
+import { glMatrix, mat4, vec3 } from 'gl-matrix'
 
 export class Camera {
 	private readonly CAMERA_SPEED = 10
@@ -29,8 +29,6 @@ export class Camera {
 
 	public allowTurning = false
 
-	constructor() {}
-
 	public setSpecular(pos: vec3, rot: vec3) {
 		this.SPECULAR_POS = pos
 
@@ -47,15 +45,23 @@ export class Camera {
 		this.updateRotationText()
 	}
 
-	private updatePositionText () {
+	private updatePositionText() {
 		if (this.positionText) {
-			this.positionText.innerHTML = `x = ${this.cameraPos[0].toFixed(2)} | y = ${this.cameraPos[1].toFixed(2)} | z = ${this.cameraPos[2].toFixed(2)}`
+			this.positionText.innerHTML = `x = ${this.cameraPos[0].toFixed(
+				2,
+			)} | y = ${this.cameraPos[1].toFixed(2)} | z = ${this.cameraPos[2].toFixed(
+				2,
+			)}`
 		}
 	}
 
-	private updateRotationText () {
+	private updateRotationText() {
 		if (this.rotationText) {
-			this.rotationText.innerHTML = `rx = ${this.cameraFront[0].toFixed(2)} | ry = ${this.cameraFront[1].toFixed(2)} | rz = ${this.cameraFront[2].toFixed(2)}`
+			this.rotationText.innerHTML = `rx = ${this.cameraFront[0].toFixed(
+				2,
+			)} | ry = ${this.cameraFront[1].toFixed(
+				2,
+			)} | rz = ${this.cameraFront[2].toFixed(2)}`
 		}
 	}
 
@@ -157,8 +163,8 @@ export class Camera {
 		this.updatePositionText()
 	}
 
-	public getViewMatrix () {
-		let view: mat4 = mat4.create()
+	public getViewMatrix() {
+		const view: mat4 = mat4.create()
 
 		const center: vec3 = [0, 0, 0]
 
@@ -169,7 +175,7 @@ export class Camera {
 		return view
 	}
 
-	public lockCamera () {
+	public lockCamera() {
 		if (!this.isLocked) {
 			this.isLocked = true
 
@@ -177,7 +183,7 @@ export class Camera {
 		}
 	}
 
-	public unlockCamera () {
+	public unlockCamera() {
 		this.isLocked = false
 	}
 }

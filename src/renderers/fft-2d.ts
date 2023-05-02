@@ -1,11 +1,11 @@
-import { CONSTANTS } from "../constants/constants";
+import { CONSTANTS } from '../constants/constants'
 
 /* WebGL */
-import { Shader } from "../webgl/shader";
-import { ShaderProgram } from "../webgl/shader-program";
-import { Renderer } from "./renderer";
+import { Shader } from '../webgl/shader'
+import { ShaderProgram } from '../webgl/shader-program'
+import { Renderer } from './renderer'
 
-import { max } from "lodash";
+import { max } from 'lodash'
 
 export class FFT2D extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT2D
@@ -14,6 +14,7 @@ export class FFT2D extends Renderer {
 
 	private shaderProgram: ShaderProgram | null = null
 
+	// eslint-disable-next-line @typescript-eslint/ban-types
 	private uniformSetters: Record<string, Function> = {}
 
 	private positionAttributeLocation = -1
@@ -30,7 +31,7 @@ export class FFT2D extends Renderer {
 
 	private indices: number[] = []
 
-	public init () {
+	public init() {
 		if (this.isInitialized) {
 			this.log('log', 'FFT2D has been initialized!')
 			return
@@ -45,21 +46,30 @@ export class FFT2D extends Renderer {
 		this.log('log', 'Initialized')
 	}
 
-	private initWebGL () {
+	private initWebGL() {
 		const gl = this.gl
 
 		if (!gl) {
-			this.log('error', 'No WebGL2 Rendering Context found! Your browser may not support WebGL2')
+			this.log(
+				'error',
+				'No WebGL2 Rendering Context found! Your browser may not support WebGL2',
+			)
 			return
 		}
 
 		// Set WebGL Viewport
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
 
 		// Create Shaders
-		const vertexShader = Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT2D.VERTEX_SCRIPT_ID)
+		const vertexShader = Shader.fromScript(
+			gl,
+			CONSTANTS.SHADER_SCRIPTS.FFT2D.VERTEX_SCRIPT_ID,
+		)
 
-		const fragmentShader = Shader.fromScript(gl, CONSTANTS.SHADER_SCRIPTS.FFT2D.FRAGMENT_SCRIPT_ID)
+		const fragmentShader = Shader.fromScript(
+			gl,
+			CONSTANTS.SHADER_SCRIPTS.FFT2D.FRAGMENT_SCRIPT_ID,
+		)
 
 		// Create Shader Program
 		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
@@ -73,11 +83,14 @@ export class FFT2D extends Renderer {
 
 		// Set uniforms
 		shaderProgram.setUniforms(this.uniformSetters, {
-			'u_resolution': [gl.canvas.width, gl.canvas.height],
+			u_resolution: [gl.canvas.width, gl.canvas.height],
 		})
 
 		// Get attribute locations
-		this.positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
+		this.positionAttributeLocation = gl.getAttribLocation(
+			shaderProgram.program,
+			'a_position',
+		)
 
 		this.VAO = gl.createVertexArray()
 
@@ -102,9 +115,10 @@ export class FFT2D extends Renderer {
 
 		// Disable DEPTH_TEST
 		// Since this is 2D
-		gl.disable(gl.DEPTH_TEST);
+		gl.disable(gl.DEPTH_TEST)
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	public update(_: number): void {
 		// nothing here to update
 	}
@@ -130,13 +144,13 @@ export class FFT2D extends Renderer {
 		super.clear()
 	}
 
-	private clearData () {
+	private clearData() {
 		this.vertices = []
 
 		this.indices = []
 	}
 
-	private clearWebGL () {
+	private clearWebGL() {
 		const gl = this.gl
 
 		if (gl) {
@@ -162,14 +176,17 @@ export class FFT2D extends Renderer {
 		this.indicesBuffer = null
 	}
 
-	private renderUsingWebGL (_: number) {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	private renderUsingWebGL(_: number) {
 		if (!this.gl) {
 			this.log('error', 'Your browser may not support WebGL2 Rendering Context')
 			return
 		}
 
 		if (!this.shaderProgram) {
-			throw new Error(`[${this.rendererName}] Shader Program is null. You maybe forger to create it`)
+			throw new Error(
+				`[${this.rendererName}] Shader Program is null. You maybe forger to create it`,
+			)
 		}
 
 		if (!this.dataSource) {
@@ -190,10 +207,11 @@ export class FFT2D extends Renderer {
 
 		const DELTAX = gl.canvas.width / numData
 
-		const MAX = (max(dataSource) ?? 0)
+		const MAX = max(dataSource) ?? 0
 
 		// Start drawing from the bottom-left corner of the canvas
-		let lastX = 0, lastY = 0
+		let lastX = 0,
+			lastY = 0
 
 		let y: number
 
@@ -206,7 +224,8 @@ export class FFT2D extends Renderer {
 
 			this.vertices.push(
 				// x y
-				lastX + DELTAX, y,
+				lastX + DELTAX,
+				y,
 			)
 
 			this.indices.push(i, i + 1)
@@ -223,13 +242,21 @@ export class FFT2D extends Renderer {
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
 
 		// Fetch vertices data into the vertices buffer
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertices), gl.DYNAMIC_DRAW)
+		gl.bufferData(
+			gl.ARRAY_BUFFER,
+			new Float32Array(this.vertices),
+			gl.DYNAMIC_DRAW,
+		)
 
 		// Tell WebGL to use the indices array buffer
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indicesBuffer)
 
 		// Fetch indices data into the indices buffer
-		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices), gl.DYNAMIC_DRAW)
+		gl.bufferData(
+			gl.ELEMENT_ARRAY_BUFFER,
+			new Uint16Array(this.indices),
+			gl.DYNAMIC_DRAW,
+		)
 
 		// Tell WebGL to use the vertices array buffer
 		gl.bindBuffer(gl.ARRAY_BUFFER, this.verticesBuffer)
@@ -244,7 +271,14 @@ export class FFT2D extends Renderer {
 		const stride = 0
 		const offset = 0
 
-		gl.vertexAttribPointer(this.positionAttributeLocation, size, type, normalize, stride, offset)
+		gl.vertexAttribPointer(
+			this.positionAttributeLocation,
+			size,
+			type,
+			normalize,
+			stride,
+			offset,
+		)
 
 		// Tell WebGL to use the indices array buffer
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indicesBuffer)
@@ -258,7 +292,7 @@ export class FFT2D extends Renderer {
 
 		// Set uniform
 		this.shaderProgram.setUniforms(this.uniformSetters, {
-			'maxHeight': MAX
+			maxHeight: MAX,
 		})
 
 		gl.bindVertexArray(this.VAO)
@@ -276,7 +310,8 @@ export class FFT2D extends Renderer {
 		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
 	}
 
-	private renderUsingCanvas (_: number) {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	private renderUsingCanvas(_: number) {
 		if (!this.ctx) {
 			this.log('error', 'Your browser may not support Canvas 2D Rendering Context')
 			return
@@ -296,27 +331,22 @@ export class FFT2D extends Renderer {
 		const numData = dataSource.length
 
 		// Fill canvas background
-		ctx.fillStyle = "rgb(0, 0, 0)";
+		ctx.fillStyle = 'rgb(0, 0, 0)'
 
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-		const barWidth = (canvas.width / numData) * 2.5;
+		const barWidth = (canvas.width / numData) * 2.5
 
-		let barHeight: number;
-		let x = 0;
+		let barHeight: number
+		let x = 0
 
 		for (let i = 0; i < numData; i++) {
-			barHeight = dataSource[i];
+			barHeight = dataSource[i]
 
-			ctx.fillStyle = "rgb(" + (barHeight + 100) + ",50,50)";
-			ctx.fillRect(
-				x,
-				this.canvas.height - barHeight / 2,
-				barWidth,
-				barHeight / 2
-			);
+			ctx.fillStyle = 'rgb(' + (barHeight + 100) + ',50,50)'
+			ctx.fillRect(x, this.canvas.height - barHeight / 2, barWidth, barHeight / 2)
 
-			x += barWidth + 1;
+			x += barWidth + 1
 		}
 	}
 }

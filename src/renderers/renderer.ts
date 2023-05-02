@@ -1,4 +1,4 @@
-import { Camera } from "../webgl/camera"
+import { Camera } from '../webgl/camera'
 
 export abstract class Renderer {
 	protected abstract _rendererName: string
@@ -28,21 +28,21 @@ export abstract class Renderer {
 		this.isWebGLSupported = this.gl !== null
 	}
 
-	get isInitialized () {
+	get isInitialized() {
 		return this._isInitialized
 	}
 
-	get rendererName () {
+	get rendererName() {
 		return this._rendererName
 	}
 
 	public abstract init(): void
 
-	public abstract render (dt: number): void
+	public abstract render(dt: number): void
 
-	public abstract update (dt: number): void
+	public abstract update(dt: number): void
 
-	protected log (type: 'log' | 'warn' | 'error' = 'log', ...data: any[]) {
+	protected log(type: 'log' | 'warn' | 'error' = 'log', ...data: unknown[]) {
 		switch (type) {
 			case 'error':
 				console.error(`Renderer [${this.rendererName}]`, data)
@@ -55,7 +55,7 @@ export abstract class Renderer {
 		}
 	}
 
-	public setWebWorker (value: boolean) {
+	public setWebWorker(value: boolean) {
 		if (!this.supportWebWorker) return
 
 		if (value === this.useWebWorker) {
@@ -71,13 +71,13 @@ export abstract class Renderer {
 		this.init()
 	}
 
-	public existPointerLockMode () {
+	public existPointerLockMode() {
 		if (document.pointerLockElement) {
 			document.exitPointerLock()
 		}
 	}
 
-	public clear () {
+	public clear() {
 		this._isInitialized = false
 	}
 
@@ -91,7 +91,7 @@ export abstract class Renderer {
 
 	// Detech changes in canvas size and change canvas size accordingly
 	// Only call when WebGL is supported
-	protected resizeCanvasToDisplaySize () {
+	protected resizeCanvasToDisplaySize() {
 		if (this.gl) {
 			const width = (this.gl.canvas as HTMLCanvasElement).clientWidth
 			const height = (this.gl.canvas as HTMLCanvasElement).clientHeight

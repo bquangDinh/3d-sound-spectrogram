@@ -1,19 +1,19 @@
-import { vec3 } from "gl-matrix";
+import { vec3 } from 'gl-matrix'
 
 export const CONSTANTS = {
 	SHADER_SCRIPTS: {
 		FFT3D: {
 			VERTEX_SCRIPT_ID: 'fft3d-vertex-shader',
-			FRAGMENT_SCRIPT_ID: 'fft3d-fragment-shader'
+			FRAGMENT_SCRIPT_ID: 'fft3d-fragment-shader',
 		},
 		FFT2D: {
 			VERTEX_SCRIPT_ID: 'fft2d-vertex-shader',
-			FRAGMENT_SCRIPT_ID: 'fft2d-fragment-shader'
+			FRAGMENT_SCRIPT_ID: 'fft2d-fragment-shader',
 		},
 		FFT3D_POINTGRID: {
 			VERTEX_SCRIPT_ID: 'fft3d-pg-vertex-shader',
-			FRAGMENT_SCRIPT_ID: 'fft3d-pg-fragment-shader'
-		}
+			FRAGMENT_SCRIPT_ID: 'fft3d-pg-fragment-shader',
+		},
 	},
 	DOM_ELEMENTS: {
 		CAMERA_DEBUG_POS_SPAN_ID: 'camera-pos',
@@ -31,14 +31,14 @@ export const CONSTANTS = {
 		USE_WEBWORKER_CHECKBOX_ID: 'use-web-worker-cb',
 		WEBWORKER_CHECKBOX_CONTAINER_ID: 'webworker-cb-container',
 		TRACKBAR_BALL_ID: 'trackball',
-		TRACKBAR_ID: 'soundtrack-bar'
+		TRACKBAR_ID: 'soundtrack-bar',
 	},
 	RENDERERS: {
 		NAMES: {
 			FFT2D: 'fft-2d',
 			FFT3D: 'fft-3d',
-			FFT3D_POINTGRID: 'fft-3d-point-grid'
-		}
+			FFT3D_POINTGRID: 'fft-3d-point-grid',
+		},
 	},
 	CAMERA: {
 		FFT3D: {
@@ -47,11 +47,11 @@ export const CONSTANTS = {
 		},
 		FFT3D_POINTGRID: {
 			SPECULAR_POS: vec3.fromValues(-57, 7, -46),
-			SPECULAR_ROT: vec3.fromValues(0.75, 0.2, 0.64)
-		}
+			SPECULAR_ROT: vec3.fromValues(0.75, 0.2, 0.64),
+		},
 	},
 	WORKER: {
 		SOURCE_FROM_MAIN_THREAD: '0',
 		RESULT_FROM_WORKER: '1',
-	}
+	},
 }
