@@ -361,7 +361,7 @@ export const UIUtils = {
 			selectedSelects[i].style.height = `${size}px`
 		}
 	},
-	setSubHeaderText: (message: string, status: 'error' | 'warn' | 'info' | 'soundtrack-playing' | 'microphone-recording') => {
+	setSubHeaderText: (message: string, status: 'error' | 'warn' | 'info' | 'soundtrack-playing' | 'microphone-recording' | 'loading' | 'none') => {
 		const subHeaderText = document.getElementById(CONSTANTS.DOM_ELEMENTS.SUB_HEADER_TEXT_ID)
 
 		if (!subHeaderText) {
@@ -376,16 +376,42 @@ export const UIUtils = {
 				break
 			case 'soundtrack-playing':
 				icon = '<i class="fa-solid fa-music fa-fade"></i>'
+				break
 			case 'microphone-recording':
 				icon = '<i class="fa-solid fa-microphone fa-fade"></i>'
+				break
+			case 'loading':
+				icon = '<i class="fa-solid fa-spinner fa-spin" style="color: #f5f5f5;"></i>'
+				break
 			case 'warn':
 				icon = '<i class="fa-solid fa-triangle-exclamation" style="color: #ffd500;"></i>'
 				break
 			case 'info':
-			default:
 				icon = '<i class="fa-solid fa-circle-info" style="color: #3d84ff;"></i>'
+				break
+			case 'none':
+			default:
+				icon = ''
 		}
 
 		subHeaderText.innerHTML = `${icon} ${message}`
+	},
+	toggleOptionButton: (eleOrId: HTMLButtonElement | string, disabled: boolean) => {
+		let ele: HTMLButtonElement | null = null
+
+		if (typeof eleOrId === 'string') {
+			ele = document.getElementById(eleOrId) as HTMLButtonElement
+		} else {
+			ele = eleOrId
+		}
+
+		if (disabled) {
+			ele.classList.add('disabled')
+			ele.setAttribute('disabled', 'disabled')
+			ele.dataset.select = '0'
+		} else {
+			ele.classList.remove('disabled')
+			ele.removeAttribute('disabled')
+		}
 	}
 }

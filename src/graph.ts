@@ -6,7 +6,13 @@ import { FFT3D } from "./renderers/fft-3d";
 import { FFT3DPointGrid } from "./renderers/fft-3d-point-grid";
 import { Renderer } from "./renderers/renderer";
 
-export type GraphOptions = 'source' | 'cameraMovement' | 'graph' | 'webworker'
+/* Audio Files */
+import ValseOp69No1 from './assets/audios/valse_op69_no_1.mp3'
+import IllAlwaysRemember from './assets/audios/illalwaysremember.mp3'
+
+import { UIUtils } from "./utils/utils";
+
+export type GraphOptions = 'source' | 'cameraMovement' | 'graph' | 'webworker' | 'soundtrack'
 
 export const GRAPH_OPS = {
 	FFT3D: 'fft-3d',
@@ -24,6 +30,13 @@ export const CAMERA_MOVEMENT_OPS = {
 	FREE: 'free'
 }
 
+export const SOUNDTRACKS = {
+	ILL_ALWAYS_REMEMBER: '1',
+	VALSE_OP_69_N1: '2',
+}
+
+export type SourceType = 'mic' | 'soundtrack'
+
 export class Graph {
 	private canvas!: HTMLCanvasElement
 
@@ -37,17 +50,31 @@ export class Graph {
 
 	private analyser: AnalyserNode | null = null
 
+	private mic: MediaStreamAudioSourceNode | null = null
+
+	private soundtrack: AudioBufferSourceNode | null = null
+
 	private dataArray: Uint8Array = new Uint8Array()
 
 	private isInitialized = false
 
-	private isMicrophoneConnected = false
+	private currentAudioSource: SourceType | null = null
+
+	private currentSoundtrack: string = SOUNDTRACKS.ILL_ALWAYS_REMEMBER
+
+	private audioSourceStatus: 'loading' | 'done' | 'error' | 'none' = 'none'
+
+	private soundConnections = {
+		mic: false,
+		audio: false
+	}
 
 	private options: Record<GraphOptions, string | boolean> = {
 		source: 'mic',
 		cameraMovement: 'lock',
 		graph: '3d',
 		webworker: false,
+		soundtrack: SOUNDTRACKS.ILL_ALWAYS_REMEMBER
 	}
 
 	/* Graph Renderers */
@@ -130,9 +157,7 @@ export class Graph {
 
 			previousTime = currentTime
 
-			this.setActiveRenderer()
-
-			this.setBasedOnOptions()
+			this.setStateBaseOnOptions()
 
 			this.update(deltaTime)
 
@@ -149,20 +174,13 @@ export class Graph {
 	}
 
 	private update (dt: number) {
-		switch (this.options.source) {
-			case SOURCE_OPS.MIC:
-				if (!this.isMicrophoneConnected) {
-					this.connectMicrophone().then(() => {
-						this.updateSourceFromMic()
-					})
-				} else {
-					this.updateSourceFromMic()
-				}
-				break
-			case SOURCE_OPS.SOUNDTRACK:
-				// Make sure to disconnect the microphone
-				this.disconnectMirophone()
+		if (!this.currentAudioSource) {
+			// no source connected
+			return
 		}
+
+		// Update source data
+		this.updateSource()
 
 		// Call renderer's updates
 		if (this.activeRenderer) {
@@ -174,6 +192,13 @@ export class Graph {
 		if (this.activeRenderer) {
 			this.activeRenderer.render(dt)
 		}
+	}
+
+	private setStateBaseOnOptions () {
+		this.setSource()
+		this.setActiveRenderer()
+		this.setCameraMovement()
+		this.setUseWorker()
 	}
 
 	private setActiveRenderer () {
@@ -211,7 +236,7 @@ export class Graph {
 		}
 	}
 
-	private setBasedOnOptions () {
+	private setCameraMovement() {
 		if (!this.activeRenderer) {
 			return
 		}
@@ -220,7 +245,6 @@ export class Graph {
 		if (this.activeRenderer.camera) {
 			switch (this.options.cameraMovement) {
 				case CAMERA_MOVEMENT_OPS.FREE:
-
 					this.activeRenderer.camera.unlockCamera()
 					break
 				case CAMERA_MOVEMENT_OPS.LOCK:
@@ -228,9 +252,73 @@ export class Graph {
 					this.activeRenderer.camera.lockCamera()
 			}
 		}
+	}
+
+	private setUseWorker () {
+		if (!this.activeRenderer) {
+			return
+		}
 
 		// Set use web worker option
 		this.activeRenderer.setWebWorker(this.options.webworker as boolean)
+	}
+
+	private setSource() {
+		if (this.currentAudioSource === 'mic' && this.options.source === 'mic') {
+			// mic is already set
+			return
+		}
+
+		if (this.currentAudioSource === 'soundtrack' && this.options.source === 'soundtrack') {
+			if (this.currentSoundtrack === this.options.soundtrack) {
+				// soundtrack is already set
+				return
+			}
+		}
+
+		if (this.audioSourceStatus === 'loading') {
+			// already being loaded
+			return;
+		}
+
+		let connectSourcePromise: Promise<void>
+
+		this.audioSourceStatus = 'loading'
+
+		UIUtils.setSubHeaderText('Brewing!...', 'loading')
+
+		switch (this.options.source) {
+			case SOURCE_OPS.SOUNDTRACK:
+				connectSourcePromise = this.connectToSoundtrack(this.options.soundtrack as string)
+			case SOURCE_OPS.MIC:
+			default:
+				connectSourcePromise = this.connectMicrophone()
+		}
+
+		connectSourcePromise.then(() => {
+			this.audioSourceStatus = 'done'
+
+			UIUtils.setSubHeaderText('Done!', 'info')
+
+			if (this.currentAudioSource === 'mic') {
+				// Make sure to disconnect
+				this.disconnectAudioSource()
+			} else {
+				// Make sure to disconnect
+				this.disconnectMirophone()
+			}
+
+			setTimeout(() => {
+				if (this.currentAudioSource === 'mic') {
+					UIUtils.setSubHeaderText('From mic', 'microphone-recording')
+				} else {
+					UIUtils.setSubHeaderText('From soundtrack', 'soundtrack-playing')
+				}
+			}, 1500)
+		})
+
+		this.currentAudioSource = this.options.source as SourceType
+		this.currentSoundtrack = this.options.soundtrack as string
 	}
 
 	/* Source Functions */
@@ -244,7 +332,8 @@ export class Graph {
 			return;
 		}
 
-		if (this.isMicrophoneConnected) {
+		if (this.soundConnections.mic) {
+			// already connected to microphone
 			return;
 		}
 
@@ -252,17 +341,21 @@ export class Graph {
 
 		this.mediaStream = stream
 
-		const mic = this.audioContext.createMediaStreamSource(stream)
+		if (!this.mic) {
+			const mic = this.audioContext.createMediaStreamSource(stream)
 
-		mic.connect(this.analyser)
+			this.mic = mic
+		}
+
+		this.mic.connect(this.analyser)
 
 		this.analyser.connect(this.audioContext.destination)
 
-		this.isMicrophoneConnected = true
+		this.soundConnections.mic = true
 	}
 
 	private disconnectMirophone () {
-		if (this.isMicrophoneConnected) {
+		if (this.soundConnections.mic) {
 			if (!this.analyser) {
 				throw new Error('No analyser was found!')
 			}
@@ -271,21 +364,118 @@ export class Graph {
 				throw new Error('No media stream was found!')
 			}
 
-			if (this.analyser) {
-				this.analyser.disconnect()
+			if (!this.mic) {
+				throw new Error('There is no mic source. You may forgot to initialize it')
 			}
 
-			if (this.mediaStream) {
-				this.mediaStream.getTracks().forEach((track) => track.stop())
-			}
+			this.mic.disconnect(this.analyser)
+
+			this.mic.disconnect()
+
+			this.analyser.disconnect()
+
+			this.mediaStream.getTracks().forEach((track) => track.stop())
 
 			this.clearData()
 
-			this.isMicrophoneConnected = false;
+			this.soundConnections.mic = false
 		}
 	}
 
-	private updateSourceFromMic () {
+	private async connectToSoundtrack (name: string): Promise<void> {
+		if (!this.analyser) {
+			throw new Error('No analyser was found!')
+		}
+
+		if (this.soundConnections.audio && this.currentSoundtrack === name) {
+			// already connected to soundtrack
+			return
+		}
+
+		if (this.soundConnections.audio) {
+			this.disconnectAudioSource()
+		}
+
+		let url = ValseOp69No1
+
+		if (name === SOUNDTRACKS.VALSE_OP_69_N1) {
+			url = ValseOp69No1
+		} else if (name === SOUNDTRACKS.ILL_ALWAYS_REMEMBER) {
+			url = IllAlwaysRemember
+		}
+
+		return new Promise((resolve, reject) => {
+			const source = this.audioContext.createBufferSource()
+
+			const request = new XMLHttpRequest()
+
+			request.open('GET', url, true)
+
+			request.responseType = "arraybuffer";
+
+			request.onload = async () => {
+				if (!this.analyser) {
+					throw new Error('No analyser avaiable. You may forgot initialize it')
+				}
+
+				const audioData = request.response
+
+				const buffer = await this.audioContext.decodeAudioData(audioData)
+
+				source.buffer = buffer
+
+				source.connect(this.analyser)
+
+				this.analyser.connect(this.audioContext.destination)
+
+				source.loop = true
+
+				source.start(0)
+
+				this.soundtrack = source
+
+				this.soundConnections.audio = true
+
+				resolve()
+			}
+
+			request.onerror = () => {
+				reject('Failed to connect audio source')
+			}
+
+			request.send()
+		})
+	}
+
+	private disconnectAudioSource () {
+		if (this.soundConnections.audio) {
+			if (!this.analyser) {
+				throw new Error('No analyser was found!')
+			}
+
+			if (!this.mediaStream) {
+				throw new Error('No media stream was found!')
+			}
+
+			if (!this.soundtrack) {
+				throw new Error('There is no soundtrack source. You may forgot to initialize it')
+			}
+
+			this.soundtrack.stop()
+
+			this.soundtrack.disconnect(this.analyser)
+
+			this.analyser.disconnect()
+
+			this.mediaStream.getTracks().forEach((track) => track.stop())
+
+			this.clearData()
+
+			this.soundConnections.audio = false
+		}
+	}
+
+	private updateSource () {
 		if (this.analyser) {
 			// In case I forget
 			if (this.dataArray.length < this.analyser.frequencyBinCount) {

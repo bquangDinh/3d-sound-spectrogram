@@ -426,7 +426,6 @@ export class FFT3DPointGrid extends Renderer {
 	 */
 	private processKeyInput (dt: number) {
 		if (!this.camera) {
-			this.log('warn', 'You forgot to init camera for FFT3D')
 			return
 		}
 
@@ -450,7 +449,6 @@ export class FFT3DPointGrid extends Renderer {
 	/* Event Handlers */
 	private onMouseInput (ev: MouseEvent) {
 		if (!this.camera) {
-			this.log('warn', 'You forgot to init camera for FFT3D')
 			return
 		}
 
