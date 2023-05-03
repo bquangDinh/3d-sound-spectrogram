@@ -1,426 +1,712 @@
-import { util as FFTUtil } from "fft-js";
-import { FileUtils, NumberUtils } from "./utils";
-import { min, max } from "lodash";
-import { Shader } from "./webgl/shader";
-import { ShaderProgram } from "./webgl/shader-program";
-import { MarchingCube } from "./marching-cube";
+import { CONSTANTS } from './constants/constants'
+
+/* Renderers */
+import { FFT2D } from './renderers/fft-2d'
+import { FFT3D } from './renderers/fft-3d'
+import { FFT3DPointGrid } from './renderers/fft-3d-point-grid'
+import { Renderer } from './renderers/renderer'
+
+/* Audio Files */
+import ValseOp69No1 from './assets/audios/valse_op69_no_1.mp3'
+import IllAlwaysRemember from './assets/audios/illalwaysremember.mp3'
+import Menuet from './assets/audios/menuet.mp3'
+
+import { FileUtils, UIUtils } from './utils/utils'
+
+export type GraphOptions =
+	| 'source'
+	| 'cameraMovement'
+	| 'graph'
+	| 'webworker'
+	| 'soundtrack'
+
+export const GRAPH_OPS = {
+	FFT3D: 'fft-3d',
+	FFT2D: 'fft-2d',
+	FFT3D_POINTGRID: 'fft-3d-point-grid',
+}
+
+export const SOURCE_OPS = {
+	MIC: 'mic',
+	SOUNDTRACK: 'soundtrack',
+	FILE: 'file',
+}
+
+export const CAMERA_MOVEMENT_OPS = {
+	LOCK: 'lock',
+	FREE: 'free',
+}
+
+export const SOUNDTRACKS = {
+	ILL_ALWAYS_REMEMBER: '1',
+	VALSE_OP_69_N1: '3',
+	MENUET: '2',
+}
+
+export type SourceType = 'mic' | 'soundtrack' | 'file'
 
 export class Graph {
+	/* DOM Elements */
 	private canvas!: HTMLCanvasElement
+
 	private canvasContainer!: HTMLDivElement
 
-	constructor(
-		canvasId: string,
-		canvasContainerId: string
-	) {
-		this.canvas = document.getElementById(canvasId) as HTMLCanvasElement
-		this.canvasContainer = document.getElementById(canvasContainerId) as HTMLDivElement
+	private canvasOverlay!: HTMLDivElement
 
-		if (!this.canvas || !this.canvasContainer) {
-			throw new Error('Canvas Or Container is null')
+	private trackbar: HTMLElement | null = null
+
+	private trackball: HTMLElement | null = null
+
+	private readonly FFT_SIZE = 512
+
+	private mediaStream: MediaStream | null = null
+
+	private audioContext: AudioContext
+
+	private analyser: AnalyserNode | null = null
+
+	private mic: MediaStreamAudioSourceNode | null = null
+
+	private soundtrack: AudioBufferSourceNode | null = null
+
+	private dataArray: Uint8Array = new Uint8Array()
+
+	private isInitialized = false
+
+	private currentAudioSource: SourceType | null = null
+
+	private currentSoundtrack: string = SOUNDTRACKS.ILL_ALWAYS_REMEMBER
+
+	private audioSourceStatus: 'loading' | 'done' | 'error' | 'none' = 'none'
+
+	private soundConnections = {
+		mic: false,
+		audio: false,
+	}
+
+	private options: Record<GraphOptions, string | boolean> = {
+		source: 'mic',
+		cameraMovement: 'lock',
+		graph: '3d',
+		webworker: true,
+		soundtrack: SOUNDTRACKS.ILL_ALWAYS_REMEMBER,
+	}
+
+	/* Graph Renderers */
+	private renderers: Record<string, Renderer> = {}
+
+	private activeRenderer: Renderer | null = null
+
+	private audioStartedAt = 0
+
+	constructor() {
+		this.canvas = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CANVAS_ID,
+		) as HTMLCanvasElement
+		this.canvasContainer = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CANVAS_CONTAINER_ID,
+		) as HTMLDivElement
+		this.canvasOverlay = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CANVAS_OVERLAY_ID,
+		) as HTMLDivElement
+
+		this.trackbar = document.getElementById(CONSTANTS.DOM_ELEMENTS.TRACKBAR_ID)
+		this.trackball = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.TRACKBAR_BALL_ID,
+		)
+
+		if (!this.canvas || !this.canvasContainer || !this.canvasOverlay) {
+			throw new Error('Canvas Or Container Or Overlay is null')
 		}
+
+		this.canvasOverlay.addEventListener(
+			'click',
+			this.resumeAudioContext.bind(this),
+		)
 
 		this.canvas.width = this.canvasContainer.clientWidth
 		this.canvas.height = this.canvasContainer.clientHeight
+
+		this.audioContext = new AudioContext()
+
+		this.renderers = {
+			[CONSTANTS.RENDERERS.NAMES.FFT2D]: new FFT2D(this.canvas),
+			[CONSTANTS.RENDERERS.NAMES.FFT3D]: new FFT3D(this.canvas),
+			[CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID]: new FFT3DPointGrid(this.canvas),
+		}
 	}
 
-	public async fromFile (file: File) {
-		const arrayBuffer = await FileUtils.getArrayBufferFromBlob(file)
-
-		const audioData = await FileUtils.getAudioDataFromArrayBuffer(arrayBuffer, {
-			channel: 0
-		})
-
-		// Since FFT only accept array of length of power of 2
-		// So I have to do some padding here
-		const audioArray = Array.from(audioData)
-
-		const nextPowerOf2 = NumberUtils.getTheNextHighestPowerOf2(audioArray.length)
-
-		if (nextPowerOf2 !== audioArray.length) {
-			for (let i = audioArray.length; i < nextPowerOf2; ++i) {
-				audioArray.push(0)
-			}
+	public async init() {
+		if (this.isInitialized) {
+			console.warn('Graph has been initialized')
+			return
 		}
 
-		const phasors = await FileUtils.getFFTFrequenciesFromArray(audioArray)
+		// Init analyser node
+		await this.initAnalyser()
 
-		const ctx = this.canvas.getContext('2d')
+		/* Initialize Renderers */
+		// this.initRenderers()
 
-		if (!ctx) {
-			throw new Error('Your browser does not support canvas')
-		}
-
-		const magnitudes = FFTUtil.fftMag(phasors) as number[]
-		const frequecies = FFTUtil.fftFreq(phasors, 4000) as number[]
-
-		const minMagnitude = min(magnitudes) as number
-		const maxMagnitude = max(magnitudes) as number
-
-		const getXFromFrequency = (fre: number) => {
-			return NumberUtils.normalize({
-				value: fre,
-				fromRange: {
-					min: frequecies[0],
-					max: frequecies[frequecies.length - 1]
-				},
-				toRange: {
-					min: 0,
-					max: this.canvas.width
-				}
-			})
-		}
-
-		const getYFromMagnitude = (mag: number) => {
-			return NumberUtils.normalize({
-				value: mag,
-				fromRange: {
-					min: minMagnitude,
-					max: maxMagnitude,
-				},
-				toRange: {
-					// Since 0,0 is the top left corner of the canvas
-					// if min is 0, and max is height, the graph will be upside down
-					min: this.canvas.height - 10,
-					max: this.canvas.height / 2,
-				}
-			})
-		}
-
-		const DELTAX = this.canvas.width / frequecies.length
-
-		let lastX = getXFromFrequency(frequecies[0])
-		let lastY = getYFromMagnitude(magnitudes[0])
-
-		let x: number, y: number
-
-		for (let i = 1; i < frequecies.length; ++i) {
-			x = getXFromFrequency(frequecies[i])
-			y = getYFromMagnitude(magnitudes[i])
-
-			ctx.beginPath()
-			ctx.moveTo(lastX, lastY)
-			ctx.lineTo(x + DELTAX, y)
-			ctx.stroke()
-
-			lastX = x + DELTAX
-			lastY = y
-		}
-
+		this.isInitialized = true
 	}
 
-	public async fromMicrophone () {
-		if (!navigator.mediaDevices.getUserMedia) {
-			throw new Error('Your browser does not support microphone')
-		}
+	private async initAnalyser() {
+		const analyser = this.audioContext.createAnalyser()
 
-		const ctx = this.canvas.getContext('2d')
+		analyser.fftSize = this.FFT_SIZE
 
-		if (!ctx) {
-			throw new Error('Your browser does not support canvas')
-		}
+		this.analyser = analyser
 
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-
-		const audioContext = new AudioContext()
-
-		const mic = audioContext.createMediaStreamSource(stream)
-
-		const analyser = audioContext.createAnalyser()
-
-		analyser.fftSize = 1024
-
-		const bufferLength = analyser.frequencyBinCount
-
-		const dataArray = new Uint8Array(bufferLength)
-
-		mic.connect(analyser)
-
-		analyser.connect(audioContext.destination)
-
-		const draw = () => {
-			requestAnimationFrame(draw)
-
-			analyser.getByteFrequencyData(dataArray)
-
-			ctx.fillStyle = "rgb(0, 0, 0)";
-			ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-			const barWidth = (this.canvas.width / bufferLength) * 2.5;
-			let barHeight;
-			let x = 0;
-
-			for (let i = 0; i < bufferLength; i++) {
-				barHeight = dataArray[i];
-
-				ctx.fillStyle = "rgb(" + (barHeight + 100) + ",50,50)";
-				ctx.fillRect(
-					x,
-					this.canvas.height - barHeight / 2,
-					barWidth,
-					barHeight / 2
-				);
-
-				x += barWidth + 1;
-			}
-		}
-
-		draw()
+		this.dataArray = new Uint8Array(analyser.frequencyBinCount)
 	}
 
-	private async fromMic () {
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+	// private async initRenderers () {
+	// 	for (const key of Object.keys(this.renderers)) {
+	// 		this.renderers[key].init()
+	// 		this.renderers[key].connectDataSource(this.dataArray)
+	// 	}
+	// }
 
-		const audioContext = new AudioContext()
-
-		const mic = audioContext.createMediaStreamSource(stream)
-
-		const analyser = audioContext.createAnalyser()
-
-		analyser.fftSize = 1024
-
-		mic.connect(analyser)
-
-		analyser.connect(audioContext.destination)
-
-		return analyser
+	public setOption(key: GraphOptions, value: string | boolean) {
+		this.options[key] = value
 	}
 
-	public async testWebGL () {
-		const gl = this.canvas.getContext('webgl2')
+	public run() {
+		const fpsText = document.getElementById(CONSTANTS.DOM_ELEMENTS.FPS_TEXT_ID)
 
-		if (!gl) {
-			throw new Error('Your browser does not support WebGL2')
-		}
-
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-		const vertexShaderSource = `#version 300 es
-
-			// an attribute is an input (in) to a vertex shader.
-			// It will receive data from a buffer
-			in vec2 a_position;
-
-			uniform vec2 u_resolution;
-
-			// all shaders have a main function
-			void main() {
-				// Convert the position from pixels to -1 -> +1 in clip space
-				vec2 zeroToOne = a_position / u_resolution;
-				vec2 zeroToTwo = zeroToOne * 2.0;
-				vec2 clipSpace = zeroToTwo - 1.0;
-
-				gl_Position = vec4(clipSpace, 0, 1);
-			}
-		`;
-
-		const fragmentShaderSource = `#version 300 es
-
-			// fragment shaders don't have a default precision so we need
-			// to pick one. highp is a good default. It means "high precision"
-			precision highp float;
-
-			// we need to declare an output for the fragment shader
-			out vec4 outColor;
-
-			void main() {
-				// Just set the output to a constant reddish-purple
-				outColor = vec4(1, 0, 0.5, 1);
-			}
-		`;
-
-		const vertexShader = new Shader(gl, vertexShaderSource, gl.VERTEX_SHADER)
-
-		const fragmentShader = new Shader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER)
-
-		const shaderProgram = new ShaderProgram(gl, [vertexShader, fragmentShader])
-
-		const positionAttributeLocation = gl.getAttribLocation(shaderProgram.program, 'a_position')
-
-		// Create VAO
-		const vao = gl.createVertexArray()
-
-		// Use this VAO
-		gl.bindVertexArray(vao)
-
-		// Create position buffer that contains every point's locations in FFT
-		const lineBuffer = gl.createBuffer()
-
-		const indexBuffer = gl.createBuffer()
-
-		const analyser = await this.fromMic()
-
-		const bufferLength = analyser.frequencyBinCount
-
-		const dataArray = new Uint8Array(bufferLength)
-
-		let pointPositions: number[] = []
-
-		let indices: number[] = []
-
-		const draw = () => {
-			requestAnimationFrame(draw)
-
-			// Make sure the buffer is cleared
-			pointPositions = []
-
-			indices = []
-
-			// Fetch dataArray with data from the microphone
-			analyser.getByteFrequencyData(dataArray)
-
-			const DELTAX = gl.canvas.width / bufferLength
-
-			// Start drawing from the bottom-left corner of the canvas
-			let lastX = 0, lastY = 0
-
-			let y: number
-
-			pointPositions.push(lastX, lastY)
-
-			for (let i = 0; i < bufferLength; ++i) {
-				y = dataArray[i]
-
-				pointPositions.push(lastX + DELTAX, y)
-
-				indices.push(i, i + 1)
-
-				// Update lastX, lastY
-				lastX += DELTAX
-				lastY = y
-			}
-
-			// Tell WebGL to use the array buffer
-			gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
-
-			// Fetch the array buffer
-			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pointPositions), gl.DYNAMIC_DRAW)
-
-			// Tell WebGL to use the indices array buffer
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
-
-			// Fetch the index buffer
-			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.DYNAMIC_DRAW)
-
-			// Use line buffer
-			gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer)
-
-			gl.enableVertexAttribArray(positionAttributeLocation)
-
-			// Instruct WebGL how to read the buffer
-			const size = 2 // x, y components
-			const type = gl.FLOAT
-			const normalize = false
-			const stride = 0
-			const offset = 0
-
-			gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset)
-
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer)
-
-			// Make canvas transparent
-			gl.clearColor(0, 0, 0, 0)
-			gl.clear(gl.COLOR_BUFFER_BIT)
-
-			shaderProgram.use()
-
-			gl.bindVertexArray(vao)
-
-			shaderProgram.setVec2('u_resolution', [gl.canvas.width, gl.canvas.height])
-
-			gl.drawElements(gl.LINES, indices.length, gl.UNSIGNED_SHORT, 0)
-
-		}
-
-		draw()
-	}
-
-	public async testMarchingCubes () {
-		this.canvas.addEventListener('click', async () => {
-			await this.canvas.requestPointerLock()
-		})
-
-		const gl = this.canvas.getContext('webgl2')
-
-		if (!gl) {
-			throw new Error('Your browser does not support WebGL2')
-		}
-
-		const analyser = await this.fromMic()
-
-		const bufferLength = analyser.frequencyBinCount
-
-		const dataArray = new Uint8Array(bufferLength)
-
+		/* Keep track of time */
 		let previousTime = 0
-		let animation = -1
 
-		const mc = new MarchingCube(gl)
-
-		mc.init()
+		let deltaTime = 0
 
 		const draw = (currentTime: number) => {
-			// Fetch dataArray with data from the microphone
-			analyser.getByteFrequencyData(dataArray)
-
 			// Convert time to seconds
 			currentTime *= 0.001
 
-			// Compute how much time has passed since the last frame
-			const deltaTime = currentTime - previousTime
+			deltaTime = currentTime - previousTime
 
 			previousTime = currentTime
 
-			mc.ffts = dataArray
+			this.setStateBaseOnOptions()
 
-			mc.processKeyInput(deltaTime)
+			this.update(deltaTime)
 
-			mc.update(deltaTime)
+			this.render(deltaTime)
 
-			animation = requestAnimationFrame(draw)
+			if (fpsText) {
+				fpsText.innerText = `${Math.floor(1 / deltaTime)}`
+			}
+
+			requestAnimationFrame(draw)
 		}
 
-		animation = requestAnimationFrame(draw)
+		requestAnimationFrame(draw)
+	}
 
-		const KeyBoardUpCb = (ev: KeyboardEvent) => {
-			if (ev.code === 'Escape') {
-				if (animation !== -1) {
-					// Stop
-					cancelAnimationFrame(animation)
+	private update(dt: number) {
+		if (!this.currentAudioSource) {
+			// no source connected
+			return
+		}
 
-					animation = -1
-				}
+		this.updateAudioContextState()
 
-				document.removeEventListener('keyup', KeyBoardUpCb)
+		// Update source data
+		this.updateSource()
+
+		// Call renderer's updates
+		if (this.activeRenderer) {
+			this.activeRenderer.update(dt)
+		}
+	}
+
+	private async render(dt: number) {
+		if (
+			this.currentAudioSource === 'soundtrack' ||
+			this.currentAudioSource === 'file'
+		) {
+			// update trackbar
+			this.renderTrackbar()
+		} else {
+			this.toggleShowTrackbar(false)
+		}
+
+		if (this.activeRenderer) {
+			this.activeRenderer.render(dt)
+		}
+	}
+
+	private renderTrackbar() {
+		if (!this.audioContext || !this.soundtrack || !this.soundtrack.buffer) {
+			return
+		}
+
+		const currentTime =
+			(this.audioContext.currentTime - this.audioStartedAt) *
+			this.soundtrack.playbackRate.value
+
+		const percentage = currentTime / this.soundtrack.buffer.duration
+
+		this.toggleShowTrackbar(true)
+
+		this.setTrackbarPercentage(percentage)
+	}
+
+	private toggleShowTrackbar(show: boolean) {
+		if (this.trackbar) {
+			if (show) {
+				this.trackbar.classList.remove('d-none')
 			} else {
-				mc.keysMap[ev.code] = false
+				this.trackbar.classList.add('d-none')
+			}
+		}
+	}
+
+	private setTrackbarPercentage(percentage: number) {
+		if (this.trackball && this.trackbar) {
+			const x = (this.trackbar.clientWidth - 10) * percentage
+
+			this.trackball.style.transform = `translateX(${x}px)`
+		}
+	}
+
+	private setStateBaseOnOptions() {
+		this.setSource()
+		this.setActiveRenderer()
+		this.setCameraMovement()
+		this.setUseWorker()
+	}
+
+	private setActiveRenderer() {
+		let renderName: string
+
+		switch (this.options.graph) {
+			case GRAPH_OPS.FFT2D:
+				renderName = CONSTANTS.RENDERERS.NAMES.FFT2D
+				break
+			case GRAPH_OPS.FFT3D_POINTGRID:
+				renderName = CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID
+				break
+			case GRAPH_OPS.FFT3D:
+			default:
+				renderName = CONSTANTS.RENDERERS.NAMES.FFT3D
+		}
+
+		// Make sure do this once
+		if (this.activeRenderer && this.activeRenderer.rendererName !== renderName) {
+			this.activeRenderer = this.renderers[renderName]
+			this.activeRenderer.init()
+			this.activeRenderer.connectDataSource(this.dataArray)
+
+			// Clear other renderers
+			for (const key of Object.keys(this.renderers)) {
+				if (key !== renderName) {
+					this.renderers[key].clear()
+					this.renderers[key].existPointerLockMode()
+				}
+			}
+		} else if (!this.activeRenderer) {
+			this.activeRenderer = this.renderers[renderName]
+			this.activeRenderer.init()
+			this.activeRenderer.connectDataSource(this.dataArray)
+		}
+	}
+
+	private setCameraMovement() {
+		if (!this.activeRenderer) {
+			return
+		}
+
+		// Set camera options
+		if (this.activeRenderer.camera) {
+			if (document.pointerLockElement) {
+				// Mouse is being locked in canvas
+				this.activeRenderer.camera.allowTurning = true
+			} else {
+				// Mouse no longer locked in canvas
+				this.activeRenderer.camera.allowTurning = false
+			}
+
+			switch (this.options.cameraMovement) {
+				case CAMERA_MOVEMENT_OPS.FREE:
+					this.activeRenderer.camera.unlockCamera()
+					break
+				case CAMERA_MOVEMENT_OPS.LOCK:
+				default:
+					this.activeRenderer.camera.lockCamera()
+			}
+		}
+	}
+
+	private setUseWorker() {
+		if (!this.activeRenderer) {
+			return
+		}
+
+		// Set use web worker option
+		this.activeRenderer.setWebWorker(this.options.webworker as boolean)
+	}
+
+	private setSource() {
+		if (this.options.source === 'file') {
+			// Will be called when file is arrive
+			return
+		}
+
+		if (this.currentAudioSource === 'mic' && this.options.source === 'mic') {
+			// mic is already set
+			return
+		}
+
+		if (
+			this.currentAudioSource === 'soundtrack' &&
+			this.options.source === 'soundtrack'
+		) {
+			if (this.currentSoundtrack === this.options.soundtrack) {
+				// soundtrack is already set
+				return
 			}
 		}
 
-		const KeyBoardDownCb = (ev: KeyboardEvent) => {
-			if (ev.code === 'Escape') {
-				if (animation !== -1) {
-					// Stop
-					cancelAnimationFrame(animation)
+		if (this.audioSourceStatus === 'loading') {
+			// already being loaded
+			return
+		}
 
-					animation = -1
+		let connectSourcePromise: Promise<boolean>
+
+		this.audioSourceStatus = 'loading'
+
+		UIUtils.setSubHeaderText('Brewing!...', 'loading')
+
+		switch (this.options.source) {
+			case SOURCE_OPS.SOUNDTRACK:
+				connectSourcePromise = this.connectToSoundtrack(
+					this.options.soundtrack as string,
+				)
+			case SOURCE_OPS.MIC:
+			default:
+				connectSourcePromise = this.connectMicrophone()
+		}
+
+		connectSourcePromise.then((success) => {
+			if (success) {
+				this.audioSourceStatus = 'done'
+
+				UIUtils.setSubHeaderText('Done!', 'info')
+
+				if (this.currentAudioSource === 'mic') {
+					// Make sure to disconnect
+					this.disconnectAudioSource()
+				} else {
+					// Make sure to disconnect
+					this.disconnectMirophone()
 				}
 
-				document.removeEventListener('keydown', KeyBoardDownCb)
+				setTimeout(() => {
+					if (this.currentAudioSource === 'mic') {
+						UIUtils.setSubHeaderText('From mic', 'microphone-recording')
+					} else {
+						if (this.currentSoundtrack === SOUNDTRACKS.ILL_ALWAYS_REMEMBER) {
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=ZJLngfJH-rQ' target='_blank' rel='noopener noreferrer'>I'll Always Remember - Toshifumi Hinata</a>",
+								'soundtrack-playing',
+							)
+						} else if (this.currentSoundtrack === SOUNDTRACKS.VALSE_OP_69_N1) {
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=_SSkoMLobII&list=RD_SSkoMLobII&start_radio=1' target='_blank' rel='noopener noreferrer'>Chopin - Valse de l'adieu, op. 69 no. 1</a>",
+								'soundtrack-playing',
+							)
+						} else if (this.currentSoundtrack === SOUNDTRACKS.MENUET) {
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=oSkkddfHaP4' target='_blank' rel='noopener noreferrer'>Menuet - Toshifumi Hinata</a>",
+								'soundtrack-playing',
+							)
+						}
+					}
+				}, 1500)
+			}
+		})
+
+		this.currentAudioSource = this.options.source as SourceType
+		this.currentSoundtrack = this.options.soundtrack as string
+	}
+
+	/* Source Functions */
+	private async connectMicrophone() {
+		if (!this.analyser) {
+			throw new Error('No analyser was found!')
+		}
+
+		if (!navigator.mediaDevices.getUserMedia) {
+			UIUtils.setSubHeaderText(
+				'Your browser does not support microphone or the app does not have recording permission',
+				'error',
+			)
+			return false
+		}
+
+		if (this.soundConnections.mic) {
+			// already connected to microphone
+			return true
+		}
+
+		try {
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+			this.mediaStream = stream
+
+			if (!this.mic) {
+				const mic = this.audioContext.createMediaStreamSource(stream)
+
+				this.mic = mic
+			}
+
+			this.mic.connect(this.analyser)
+
+			this.analyser.connect(this.audioContext.destination)
+
+			this.soundConnections.mic = true
+
+			return true
+		} catch {
+			UIUtils.setSubHeaderText(
+				'Your browser does not support microphone or the app does not have recording permission',
+				'error',
+			)
+		}
+
+		return false
+	}
+
+	private disconnectMirophone() {
+		if (this.soundConnections.mic) {
+			if (!this.analyser) {
+				throw new Error('No analyser was found!')
+			}
+
+			if (!this.mediaStream) {
+				throw new Error('No media stream was found!')
+			}
+
+			if (!this.mic) {
+				throw new Error('There is no mic source. You may forgot to initialize it')
+			}
+
+			this.mic.disconnect(this.analyser)
+
+			this.mic.disconnect()
+
+			this.analyser.disconnect()
+
+			this.mediaStream.getTracks().forEach((track) => track.stop())
+
+			this.clearData()
+
+			this.soundConnections.mic = false
+		}
+	}
+
+	private async connectToSoundtrack(name: string): Promise<boolean> {
+		if (!this.analyser) {
+			throw new Error('No analyser was found!')
+		}
+
+		if (this.soundConnections.audio && this.currentSoundtrack === name) {
+			// already connected to soundtrack
+			return true
+		}
+
+		if (this.soundConnections.audio) {
+			this.disconnectAudioSource()
+		}
+
+		let url = ValseOp69No1
+
+		if (name === SOUNDTRACKS.VALSE_OP_69_N1) {
+			url = ValseOp69No1
+		} else if (name === SOUNDTRACKS.ILL_ALWAYS_REMEMBER) {
+			url = IllAlwaysRemember
+		} else if (name === SOUNDTRACKS.MENUET) {
+			url = Menuet
+		}
+
+		return new Promise((resolve, reject) => {
+			const source = this.audioContext.createBufferSource()
+
+			const request = new XMLHttpRequest()
+
+			request.open('GET', url, true)
+
+			request.responseType = 'arraybuffer'
+
+			request.onload = async () => {
+				if (!this.analyser) {
+					throw new Error('No analyser avaiable. You may forgot initialize it')
+				}
+
+				const audioData = request.response
+
+				const buffer = await this.audioContext.decodeAudioData(audioData)
+
+				source.buffer = buffer
+
+				source.connect(this.analyser)
+
+				this.analyser.connect(this.audioContext.destination)
+
+				source.loop = true
+
+				source.start(0)
+
+				this.soundtrack = source
+
+				this.soundConnections.audio = true
+
+				this.audioStartedAt = this.audioContext.currentTime
+
+				resolve(true)
+			}
+
+			request.onerror = () => {
+				UIUtils.setSubHeaderText(
+					'Unable to request audio file. Please check your internet connection',
+					'error',
+				)
+
+				reject(false)
+			}
+
+			request.send()
+		})
+	}
+
+	private disconnectAudioSource() {
+		if (this.soundConnections.audio) {
+			if (!this.analyser) {
+				throw new Error('No analyser was found!')
+			}
+
+			if (!this.mediaStream) {
+				throw new Error('No media stream was found!')
+			}
+
+			if (!this.soundtrack) {
+				throw new Error(
+					'There is no soundtrack source. You may forgot to initialize it',
+				)
+			}
+
+			this.soundtrack.stop()
+
+			this.soundtrack.disconnect(this.analyser)
+
+			this.analyser.disconnect()
+
+			this.mediaStream.getTracks().forEach((track) => track.stop())
+
+			this.clearData()
+
+			this.soundConnections.audio = false
+		}
+	}
+
+	public async setSourceFromFile(file: File) {
+		if (!this.audioContext) {
+			throw new Error('No audio context')
+		}
+
+		if (!this.analyser) {
+			throw new Error('No analyser')
+		}
+
+		if (this.currentAudioSource === 'mic') {
+			this.disconnectMirophone()
+		} else {
+			// Disconnect previous soundtrack
+			this.disconnectAudioSource()
+		}
+
+		try {
+			const arrayBuffer = await FileUtils.getArrayBufferFromBlob(file)
+
+			const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer)
+
+			const source = this.audioContext.createBufferSource()
+
+			source.buffer = audioBuffer
+
+			source.connect(this.analyser)
+
+			this.analyser.connect(this.audioContext.destination)
+
+			source.loop = true
+
+			source.start(0)
+
+			UIUtils.setSubHeaderText(file.name, 'info')
+
+			this.soundtrack = source
+
+			this.currentAudioSource = 'file'
+
+			this.audioStartedAt = this.audioContext.currentTime
+
+			this.soundConnections.audio = true
+		} catch {
+			UIUtils.setSubHeaderText('Your file is not valid for audio', 'error')
+		}
+	}
+
+	private updateAudioContextState() {
+		if (this.audioContext) {
+			if (this.audioContext.state === 'closed') {
+				// OS or Web Browser or something terminate the audio context
+				UIUtils.setSubHeaderText(
+					'Audio Source is not available for some reasons. Maybe a reload can help fix the problem',
+					'error',
+				)
+			} else if (this.audioContext.state === 'suspended') {
+				// Suspended by web browser
+				// require user action to resume
+				this.canvasOverlay.classList.remove('d-none')
 			} else {
-				mc.keysMap[ev.code] = true
+				this.canvasOverlay.classList.add('d-none')
 			}
 		}
+	}
 
-		const MouseMoveCb = (ev: MouseEvent) => {
-			mc.processMouseInput(ev.movementX, ev.movementY)
+	private updateSource() {
+		if (this.analyser) {
+			// In case I forget
+			if (this.dataArray.length < this.analyser.frequencyBinCount) {
+				this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
+			}
+
+			// Fetch dataArray with data from the microphone
+			this.analyser.getByteFrequencyData(this.dataArray)
+		} else {
+			throw new Error('No analyser was found!')
 		}
+	}
 
-		// Add Event to listen to keyboard change
-		document.addEventListener('keydown', KeyBoardDownCb)
+	private clearData() {
+		// clear the data buffer
 
-		document.addEventListener('keyup', KeyBoardUpCb)
+		// DON'T CREATING A NEW BUFFER
+		// SINCE THERE ARE STILL SOME NODES THAT REFERENCING TO THIS BUFFER
+		// THE OLD BUFFER THUS STILL WILL NOT BE COLLECTED BY THE GARBAGE COLLECTOR
+		const view = new DataView(this.dataArray.buffer)
 
-		document.addEventListener('mousemove', MouseMoveCb)
+		for (let i = 0; i < this.dataArray.length; ++i) {
+			view.setUint8(i, 0)
+		}
+	}
+
+	private resumeAudioContext() {
+		if (this.audioContext) {
+			this.audioContext.resume()
+		}
 	}
 }

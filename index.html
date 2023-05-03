@@ -2,18 +2,449 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
+	<meta name="description" content="A little experiment displaying sound as a 3D Marching Cube Surface. You can play with your microphone or select some of my favorite soundtracks or yours!"/>
+	<meta name="keywords" content="experiment, 3d, sound, spectrogram, graph, 2d, webgl, webgl2" />
+
+	<meta property="og:title" content="3D Sound Spectrogram - Marching Cube" />
+    <meta property="og:description" content="A little experiment displaying sound as a 3D Marching Cube Surface. You can play with your microphone or select some of my favorite soundtracks or yours!" />
+    <meta property="og:url" />
+
+	<meta property="og:image:url" content="/thumbnail.png" />
+    <meta property="og:image:secure_url" content="/thumbnail.png" />
+    <meta property="og:image:alt" content="3D Spectrogram Thumbnail" />
+	<meta property="og:image:type" content="image/png" />
+
+	<meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="3D Spectrogram - Marching Cube" />
+    <meta name="twitter:description" content="A little experiment displaying sound as a 3D Marching Cube Surface. You can play with your microphone or select some of my favorite soundtracks or yours!" />
+
+    <title>3D Sound Spectrogram</title>
   </head>
   <body>
-    <div id="app">
-		<input type="file" id="read-audio-file" accept="audio/wav">
+    <div id="app" class="center-container center-container--column">
+		<div id="header">
+			<h2>3D Sound Spectrogram - Marching Cube</h2>
+			<h4>
+				Quang Dinh Bui <a href="https://github.com/bquangDinh" target="_blank" rel="noopener noreferrer">Github</a> | <a href="https://qdinh.me/jupiter/c02a2d6f-d979-489a-99ce-dfdea79be87c" target="_blank" rel="noopener noreferrer">Blog</a>
+			</h4>
+			<span id="sub-header-text">
+			</span>
+		</div>
+
 		<div id="canvas-container">
 			<canvas id="spectrogram-canvas"></canvas>
+			<div id="canvas-overlay" class="center-container center-container--column d-none">
+				<i class="fa-solid fa-arrow-pointer fa-fade fa-xl"></i>
+				<p>Click to resume</p>
+			</div>
+		</div>
+
+		<div id="bars-container">
+			<div id="soundtrack-bar" class="d-none">
+				<div id="trackball"></div>
+			</div>
+		</div>
+
+		<div id="controller-container" class="center-container center-container--row">
+			<div class="controller">
+				<span>
+					<span class="title">
+						Soundtrack
+					</span>
+				</span>
+				<div class="content">
+					<div class="app-select">
+						<div data-name="soundtrack-selected" class="select-selected center-container center-container--row">
+							<div class="select-selected--val">
+								Select a soundtrack!
+							</div>
+							<div class="select-selected--caret">
+								<i class="fa-solid fa-caret-up" style="color: #000000;"></i>
+							</div>
+						</div>
+						<div class="items">
+						</div>
+						<select>
+							<option value="1" selected>I'll Always Remember</option>
+							<option value="2">Menuet</option>
+							<option value="3">Valse de l'adieu, op. 69 no. 1</option>
+						</select>
+					</div>
+				</div>
+			</div>
+			<div class="controller">
+				<span>
+					<span class="title">
+						Source Options
+					</span>
+				</span>
+
+				<div class="content">
+					<div class="option-btns" style="margin-top: 5px;">
+						<button class="option-btn tooltip-container" data-ops-category="source" data-ops-value="soundtrack" data-select="0">
+							<i class="fa-solid fa-music"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Source from a soundtrack</b>
+								</p>
+
+								<p>
+									Use one of my selected soundtracks. Check it out!
+								</p>
+							</span>
+						</button>
+						<button class="option-btn tooltip-container" data-ops-category="source" data-ops-value="mic" data-select="1">
+							<i class="fa-solid fa-microphone"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Source from microphone</b>
+								</p>
+
+								<p>
+									Use your microphone recording
+								</p>
+							</span>
+						</button>
+						<button class="option-btn tooltip-container" data-ops-category="source" data-ops-value="file" data-select="0">
+							<i class="fa-solid fa-file-audio"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Source from an audio file</b>
+								</p>
+
+								<p>
+									Choose your favoriate soundtrack!
+								</p>
+							</span>
+							<label>
+								<input type="file" id="file-audio-input">
+							</label>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="controller">
+				<span>
+					<span class="title">
+						Camera Movement
+					</span>
+				</span>
+
+				<div class="content">
+					<div class="option-btns" style="margin-top: 5px;">
+						<button class="option-btn tooltip-container" data-ops-category="cameraMovement"  data-ops-value="free" data-select="0">
+							<i class="fa-solid fa-person-running"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Free to move around the scene</b>
+								</p>
+								<p>
+									Disabled when selecting 2D Graph or WebGL is unavailable
+								</p>
+							</span>
+						</button>
+						<button class="option-btn tooltip-container" data-ops-category="cameraMovement"  data-ops-value="lock" data-select="1">
+							<i class="fa-solid fa-eye"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>Lock camera to a specular view</b>
+								</p>
+								<p>
+									Disabled when selecting 2D Graph or WebGL is unavailable
+								</p>
+							</span>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="controller">
+				<span>
+					<span class="title">
+						Graph
+					</span>
+				</span>
+
+				<div class="content">
+					<div class="option-btns" style="margin-top: 5px;">
+						<button class="option-btn tooltip-container" data-ops-category="graph"  data-ops-value="fft-2d" data-select="0">
+							<i class="fa-solid fa-signal"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>2D Graph</b>
+								</p>
+
+								<p>
+									Generate a 2D graph. X is frequencies and Y is each frequency's magnitude
+								</p>
+							</span>
+						</button>
+						<button class="option-btn tooltip-container" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="0">
+							<i class="fa-solid fa-grip"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>3D Marching Cube - Point Grid</b>
+								</p>
+								<p>
+									Disabled when WebGL is unavailable. Turning off Web Worker makes it flow faster than I thought. Well...
+								</p>
+							</span>
+						</button>
+						<button class="option-btn tooltip-container" data-ops-category="graph"  data-ops-value="fft-3d" data-select="1">
+							<i class="fa-solid fa-cubes"></i>
+							<span class="tooltip-text">
+								<p>
+									<b>3D Marching Cube</b>
+								</p>
+								<p>
+									Disabled when WebGL is unavailable
+								</p>
+							</span>
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="controller">
+				<span>
+					<span class="title">
+						Debug
+					</span>
+				</span>
+
+				<div class="content">
+					<div id="camera-pos">
+						x = 0 | y = 0 | z = 0
+					</div>
+					<div id="camera-rot">
+						rx = 0 | ry = 0 | rz = 0
+					</div>
+				</div>
+			</div>
+			<div class="controller">
+				<span>
+					<span class="title">
+						FPS
+					</span>
+				</span>
+
+				<div class="content">
+					<div>
+						<span id="fps-text">
+							0
+						</span>
+					</div>
+					<div>
+						<div class="app-checkbox tooltip-container" id="webworker-cb-container">
+							<label>
+								Web Worker
+								<input type="checkbox" id="use-web-worker-cb" checked>
+								<span class="placement"></span>
+							</label>
+							<span class="tooltip-text">
+								<p>
+									<b>Click to enable or disable</b>
+								</p>
+
+								Offload extensive calculations to another thread. May help to increase FPS and easier to move around. The scene will feel a bit "behind" though
+							</span>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.js"></script>
+
+	<!--SHADERS-->
+	<script type="x-shader/x-vertex" id="fft3d-vertex-shader">
+		#version 300 es
+
+		// an attribute is an input (in) to a vertex shader.
+		// It will receive data from a buffer
+		in vec3 a_position;
+		in vec3 a_normal;
+
+		uniform mat4 model;
+		uniform mat4 view;
+		uniform mat4 projection;
+
+		out vec3 v_normal;
+		out vec3 v_pos;
+
+		// all shaders have a main function
+		void main() {
+			gl_Position = projection * view * vec4(a_position, 1.0f);
+
+			// pass to fragment shader
+			v_normal = a_normal;
+			v_pos = a_position;
+		}
+	</script>
+	<script type="x-shader/x-fragment" id="fft3d-fragment-shader">
+		#version 300 es
+
+		// fragment shaders don't have a default precision so we need
+		// to pick one. highp is a good default. It means "high precision"
+		precision highp float;
+		out vec4 outColor;
+
+		uniform vec3 lightPos;
+		uniform float maxHeight;
+
+		in vec3 v_normal;
+		in vec3 v_pos;
+
+		vec3 interpolate(float height) {
+			float percentage = height / maxHeight;
+
+			vec3 objectColor;
+
+			if (percentage <= 0.4f) {
+				// interpolate between red and purple
+				objectColor = mix(vec3(1, 0, 0), vec3(1, 0, 1), percentage);
+			} else if (percentage <= 0.6f) {
+				// interpolate between purple and blue
+				objectColor = mix(vec3(1, 0, 0), vec3(0, 0, 1), percentage);
+			} else if (percentage <= 0.8f) {
+				// interpolate between blue and cyan
+				objectColor = mix(vec3(1, 0, 0), vec3(0, 1, 1), percentage);
+			} else {
+				// interpolate between cyan and green
+				objectColor = mix(vec3(1, 0, 0), vec3(0, 1, 0), percentage);
+			}
+
+			return objectColor;
+		}
+
+		void main() {
+			vec3 objectColor = interpolate(v_pos[1]);
+
+			vec3 lightColor = vec3(1, 1, 1);
+
+			float ambientStrength = 0.1f;
+
+			vec3 normal = normalize(v_normal);
+
+			vec3 lightDirection = normalize(lightPos - v_pos);
+
+			// calculate the diffuse impact on the fragment
+			// if the lightDirection is perpendicular to the surface or parallel to the normal
+			// then diffusion will have the greatest impact
+			// if the lightDirection is paralell to the surface or perpendicular to the normal
+			// then diffusion is zero (no impact on surface)
+			float diff = max(dot(normal, lightDirection), 0.0f);
+
+			vec3 diffuse = diff * lightColor;
+			vec3 ambient = ambientStrength * lightColor;
+			vec3 result = (ambient + diffuse) * objectColor;
+
+			// apply gamma correction
+			float gamma = 2.2f;
+
+			outColor = vec4(result, 1);
+
+			outColor.rgb = pow(outColor.rgb, vec3(1.0f / gamma));
+		}
+	</script>
+
+	<!--FFT2D SHADERS-->
+	<script type="x-shader/x-vertex" id="fft2d-vertex-shader">
+		#version 300 es
+
+		in vec2 a_position;
+
+		uniform vec2 u_resolution;
+
+		out vec2 v_pos;
+
+		void main() {
+			// Convert the position from pixels to -1 -> +1 in clip space
+			vec2 zeroToOne = a_position / u_resolution;
+			vec2 zeroToTwo = zeroToOne * 2.0;
+			vec2 clipSpace = zeroToTwo - 1.0;
+
+			gl_Position = vec4(clipSpace, 0, 1);
+
+			v_pos = clipSpace;
+		}
+	</script>
+	<script type="x-shader/x-fragment" id="fft2d-fragment-shader">
+		#version 300 es
+
+		precision highp float;
+
+		in vec2 v_pos;
+
+		uniform float maxHeight;
+
+		out vec4 outColor;
+
+		vec3 interpolate(float height) {
+			float percentage = height / maxHeight;
+
+			vec3 objectColor;
+
+			if (percentage <= 0.2f) {
+				// interpolate between red and purple
+				objectColor = mix(vec3(1, 0, 0), vec3(1, 0, 1), percentage / 0.2f);
+			} else if (percentage <= 0.4f) {
+				// interpolate between purple and blue
+				objectColor = mix(vec3(1, 0, 1), vec3(0, 0, 1), (0.4f - percentage) / 0.2f);
+			} else if (percentage <= 0.6f) {
+				// interpolate between blue and cyan
+				objectColor = mix(vec3(0, 0, 1), vec3(0, 1, 1), (0.6f - percentage) / 0.2f);
+			} else {
+				// interpolate between cyan and green
+				objectColor = mix(vec3(0, 1, 1), vec3(0, 1, 0), (1.0f - percentage) / 0.4f);
+			}
+
+			return objectColor;
+		}
+
+		void main() {
+			outColor = vec4(interpolate(gl_FragCoord.y), 1.0f);
+		}
+	</script>
+
+	<!--FFT3D Point Grid SHADERS-->
+	<script type="x-shader/x-vertex" id="fft3d-pg-vertex-shader">
+		#version 300 es
+
+		in vec3 a_position;
+		in float a_density;
+
+		uniform mat4 model;
+		uniform mat4 view;
+		uniform mat4 projection;
+
+		out float v_density;
+
+		void main() {
+			gl_Position = projection * view * vec4(a_position, 1.0f);
+			gl_PointSize = 5.0f;
+
+			// Pass density value to fragment shader
+			v_density = a_density;
+		}
+	</script>
+	<script type="x-shader/x-fragment" id="fft3d-pg-fragment-shader">
+		#version 300 es
+
+		precision highp float;
+
+		in float v_density;
+
+		out vec4 outColor;
+
+		void main() {
+			if (v_density == 0.0f) {
+				outColor = vec4(0.0f, 0.0f, 1.0f, 1.0f);
+			} else {
+				outColor = vec4(1.0f, v_density, 0.09f, 1.0f);
+			}
+		}
+	</script>
+
+	<script src="https://kit.fontawesome.com/8242c52d59.js" crossorigin="anonymous"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
