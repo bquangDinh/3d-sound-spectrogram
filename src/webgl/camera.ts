@@ -3,7 +3,7 @@ import { glMatrix, mat4, vec3 } from 'gl-matrix'
 export class Camera {
 	private readonly CAMERA_SPEED = 10
 
-	private readonly SENSITIVITY = 0.1
+	private readonly SENSITIVITY = 0.05
 
 	private readonly PITCH_LIMIT = 89.0
 
@@ -28,6 +28,8 @@ export class Camera {
 	public rotationText: HTMLSpanElement | null = null
 
 	public allowTurning = false
+
+	private firstMove = false
 
 	public setSpecular(pos: vec3, rot: vec3) {
 		this.SPECULAR_POS = pos
@@ -65,8 +67,35 @@ export class Camera {
 		}
 	}
 
+	private setYawPitchByCameraFront() {
+		const toDegree = (value: number) => (value * 180) / Math.PI
+
+		// Information of how to calculate yaw and pitch
+		// https://learnopengl.com/Getting-started/Camera
+		const yaw = Math.atan2(this.cameraFront[2], this.cameraFront[0])
+
+		this.yaw = toDegree(yaw)
+
+		const hypotenuse = Math.sqrt(
+			this.cameraFront[0] * this.cameraFront[0] +
+				this.cameraFront[2] * this.cameraFront[2],
+		)
+
+		const pitch = Math.atan2(this.cameraFront[1], hypotenuse)
+
+		this.pitch = toDegree(pitch)
+	}
+
 	public turnAround(offsetX: number, offsetY: number) {
 		if (this.isLocked || !this.allowTurning) return
+
+		if (!this.firstMove) {
+			this.setYawPitchByCameraFront()
+
+			this.firstMove = true
+
+			return
+		}
 
 		// Control the speed of turning around by sensitivity
 		offsetX *= this.SENSITIVITY
