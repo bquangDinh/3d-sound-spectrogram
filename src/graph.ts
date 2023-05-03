@@ -86,7 +86,7 @@ export class Graph {
 		source: 'mic',
 		cameraMovement: 'lock',
 		graph: '3d',
-		webworker: false,
+		webworker: true,
 		soundtrack: SOUNDTRACKS.ILL_ALWAYS_REMEMBER,
 	}
 

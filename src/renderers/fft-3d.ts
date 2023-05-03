@@ -105,7 +105,7 @@ export class FFT3D extends Renderer {
 
 		this.initEvents()
 
-		if (this.useWebWorker) {
+		if (this.useWebWorker && this.supportWebWorker) {
 			this.initWorker()
 		}
 
@@ -396,6 +396,8 @@ export class FFT3D extends Renderer {
 		}
 
 		this.shaderProgram.use()
+
+		console.log(!!this.worker)
 
 		if (!this.worker) {
 			this.vertices = []
