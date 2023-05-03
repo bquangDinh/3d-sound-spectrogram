@@ -12,10 +12,13 @@ import { ShaderProgram } from '../webgl/shader-program'
 import { Renderer } from './renderer'
 import { Camera } from '../webgl/camera'
 
+/* Worker */
+import Worker from '../workers/fft-3d-pointgrid.worker?worker'
+
 export class FFT3DPointGrid extends Renderer {
 	public _rendererName = CONSTANTS.RENDERERS.NAMES.FFT3D_POINTGRID
 
-	public readonly supportWebWorker = false
+	public readonly supportWebWorker = true
 
 	private shaderProgram: ShaderProgram | null = null
 
@@ -36,6 +39,18 @@ export class FFT3DPointGrid extends Renderer {
 	/* Buffer Data */
 	private vertices: number[] = []
 
+	/* Double Buffering */
+	/* Only use when using Worker */
+	private v1: number[] = []
+
+	private v2: number[] = []
+
+	// Current active buffer index
+	private activeBuffer = 1
+
+	// Flag to check whether it should send the data to the worker for the first time
+	private initSendingBuffer = false
+
 	/* FFT data */
 	private ffts: Uint8Array[] = []
 
@@ -43,6 +58,9 @@ export class FFT3DPointGrid extends Renderer {
 	private readonly DIMENSIONS: vec3 = [512, 24, 65]
 
 	private readonly VOXEL_SIZE = 2
+
+	/* Workers */
+	worker: Worker | null = null
 
 	public init(): void {
 		if (this.isInitialized) {
@@ -68,6 +86,10 @@ export class FFT3DPointGrid extends Renderer {
 		this.initData()
 
 		this.initEvents()
+
+		if (this.useWebWorker && this.supportWebWorker) {
+			this.initWorker()
+		}
 
 		this._isInitialized = true
 
@@ -207,6 +229,21 @@ export class FFT3DPointGrid extends Renderer {
 		this.canvas.addEventListener('click', this.onCanvasClick.bind(this))
 	}
 
+	private initWorker() {
+		// Check if browser support web worker
+		if (window.Worker) {
+			this.worker = new Worker()
+
+			this.worker.onmessage = (ev: MessageEvent<unknown>) => {
+				this.receiveDataFromWorker(ev.data)
+			}
+
+			this.log('log', 'Created worker')
+		} else {
+			this.log('warn', 'Web browser does not support Web Worker')
+		}
+	}
+
 	public render(dt: number): void {
 		if (!this.isWebGLSupported) return
 
@@ -235,9 +272,19 @@ export class FFT3DPointGrid extends Renderer {
 
 	public update(dt: number): void {
 		if (this.isInitialized) {
-			this.updateFFT()
+			if (!this.worker) {
+				this.updateFFT()
 
-			this.updateData()
+				this.updateData()
+			} else {
+				// If using worker, updating data is already done in worker
+				// transfer new data to workers
+				if (!this.initSendingBuffer) {
+					// If this is the first time to send data to the worker
+					this.transferDataToWorker(1)
+					this.initSendingBuffer = true
+				}
+			}
 
 			this.processKeyInput(dt)
 		}
@@ -250,12 +297,16 @@ export class FFT3DPointGrid extends Renderer {
 
 		this.clearEvents()
 
+		this.clearWorker()
+
 		super.clear()
 	}
 
 	private clearData() {
 		this.ffts = []
 		this.vertices = []
+		this.v1 = []
+		this.v2 = []
 	}
 
 	private clearWebGL() {
@@ -299,6 +350,14 @@ export class FFT3DPointGrid extends Renderer {
 		this.canvas.removeEventListener('click', this.onCanvasClick)
 	}
 
+	private clearWorker() {
+		if (this.worker) {
+			this.worker.terminate()
+			this.initSendingBuffer = false
+			this.worker = null
+		}
+	}
+
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private renderMarchingCubes(_: number) {
 		const gl = this.gl
@@ -309,6 +368,14 @@ export class FFT3DPointGrid extends Renderer {
 
 		if (!this.shaderProgram) {
 			throw new Error('No shader program!')
+		}
+
+		if (this.worker) {
+			if (this.activeBuffer === 1) {
+				this.vertices = this.v1
+			} else {
+				this.vertices = this.v2
+			}
 		}
 
 		this.shaderProgram.use()
@@ -436,11 +503,7 @@ export class FFT3DPointGrid extends Renderer {
 
 			for (let y = 0; y < this.DIMENSIONS[1]; ++y) {
 				for (let x = 0; x < this.DIMENSIONS[0]; ++x) {
-					index = NumberUtils.getIndexFromXYZ(x * 4, y, z, [
-						this.DIMENSIONS[0] * 4,
-						this.DIMENSIONS[1],
-						this.DIMENSIONS[2],
-					])
+					index = NumberUtils.getIndexFromXYZ(x, y, z, this.DIMENSIONS)
 
 					index *= 4
 
@@ -500,6 +563,83 @@ export class FFT3DPointGrid extends Renderer {
 		if (this.keysMap['KeyD']) {
 			this.camera.turnRight(dt)
 		}
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	private receiveDataFromWorker(msg: any) {
+		const { type, data, bufferIndex } = msg
+
+		if (!type || !data) {
+			throw new Error('Invalid data transfered to main thread')
+		}
+
+		if (type === CONSTANTS.WORKER.RESULT_FROM_WORKER) {
+			if (!(data instanceof ArrayBuffer) || typeof bufferIndex !== 'number') {
+				throw new Error('Invalid data transfered to main thread')
+			}
+
+			// Send the current active buffer to web worker for processing
+			this.transferDataToWorker(this.activeBuffer)
+
+			if (bufferIndex === 1) {
+				// Buffer 1 data is processed
+				// Save to the opposite buffer
+				this.v2 = this.writeBufferToVertices(data)
+
+				// Make buffer 2 as active
+				this.activeBuffer = 2
+			} else {
+				// Buffer 2 data is processed
+				// Save to the opposite buffer
+				this.v1 = this.writeBufferToVertices(data)
+
+				// Make buffer 1 as active
+				this.activeBuffer = 1
+			}
+		}
+	}
+
+	private transferDataToWorker(bufferIndex: number) {
+		if (!this.worker) {
+			throw new Error('Worker has not been initialized!')
+		}
+
+		if (!this.dataSource || this.dataSource.length === 0) return
+
+		// Pass data source buffer data to worker as a transferable object
+		// clone fft array
+		const clone = new Uint8Array(this.dataSource.length)
+
+		clone.set(this.dataSource)
+
+		this.worker.postMessage(
+			{
+				type: CONSTANTS.WORKER.SOURCE_FROM_MAIN_THREAD,
+				data: clone.buffer,
+				bufferIndex,
+			},
+			[clone.buffer],
+		)
+	}
+
+	private writeBufferToVertices(buffer: ArrayBuffer) {
+		// make sure the vertices data is clear
+		const vertices = []
+
+		const dataView = new DataView(buffer)
+
+		// Float32 is 4 bytes each
+		const length = dataView.byteLength / 4
+
+		let value: number
+
+		for (let i = 0; i < length; ++i) {
+			value = dataView.getFloat32(i * 4)
+
+			vertices.push(value)
+		}
+
+		return vertices
 	}
 
 	/* Event Handlers */

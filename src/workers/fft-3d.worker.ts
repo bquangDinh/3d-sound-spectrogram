@@ -1,10 +1,10 @@
 import { vec3, vec4 } from 'gl-matrix'
 import { CONSTANTS } from '../constants/constants'
-import { max, min } from 'lodash'
+import { max } from 'lodash'
 import { NumberUtils } from '../utils/utils'
 import { EdgeVertexIndices, TriangleTable } from '../constants/lookup-table'
 
-class TriangulateFFT {
+class Runner {
 	ffts: Uint8Array[] = []
 
 	private readonly DIMENSIONS: vec3 = [512, 24, 65]
@@ -16,14 +16,6 @@ class TriangulateFFT {
 	private data: vec4[] = []
 
 	private vertices: number[] = []
-
-	public maxX = Number.NEGATIVE_INFINITY
-
-	public minX = Number.POSITIVE_INFINITY
-
-	public maxZ = Number.NEGATIVE_INFINITY
-
-	public minZ = Number.POSITIVE_INFINITY
 
 	constructor() {
 		// Initialize vertices data array
@@ -161,14 +153,6 @@ class TriangulateFFT {
 	private triangulate() {
 		this.vertices = []
 
-		this.minX = Number.POSITIVE_INFINITY
-
-		this.maxX = Number.NEGATIVE_INFINITY
-
-		this.minZ = Number.POSITIVE_INFINITY
-
-		this.maxZ = Number.NEGATIVE_INFINITY
-
 		let cube: vec4[] = []
 
 		let index: number
@@ -282,14 +266,6 @@ class TriangulateFFT {
 
 		const normal = vec3.cross(vec3.create(), p12, p13)
 
-		this.minX = min([this.minX, p1[0], p2[0], p3[0]]) ?? Number.POSITIVE_INFINITY
-
-		this.maxX = max([this.maxX, p1[0], p2[0], p3[0]]) ?? Number.NEGATIVE_INFINITY
-
-		this.minZ = min([this.minZ, p1[2], p2[2], p3[2]]) ?? Number.POSITIVE_INFINITY
-
-		this.maxZ = max([this.maxZ, p1[2], p2[2], p3[2]]) ?? Number.NEGATIVE_INFINITY
-
 		this.vertices.push(
 			p1[0],
 			p1[1],
@@ -313,12 +289,23 @@ class TriangulateFFT {
 	}
 }
 
-const runner = new TriangulateFFT()
+let runner: Runner | null = null
+
+// Check if runner has been created
+// Make sure it is created once
+if (!runner) {
+	runner = new Runner()
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ctx: Worker = self as any
 
 ctx.addEventListener('message', (e) => {
+	if (!runner) {
+		// runner not ready
+		return
+	}
+
 	const { type, data, bufferIndex } = e.data
 
 	if (!type || !data) {
@@ -340,14 +327,6 @@ ctx.addEventListener('message', (e) => {
 				{
 					type: CONSTANTS.WORKER.RESULT_FROM_WORKER,
 					data: result,
-					min: {
-						x: runner.minX,
-						z: runner.minZ,
-					},
-					max: {
-						x: runner.maxX,
-						z: runner.maxZ,
-					},
 					bufferIndex,
 				},
 				[result],

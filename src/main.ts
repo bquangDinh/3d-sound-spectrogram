@@ -9,10 +9,7 @@ import { CONSTANTS } from './constants/constants'
 document.addEventListener(
 	'DOMContentLoaded',
 	async () => {
-		const graph = new Graph(
-			CONSTANTS.DOM_ELEMENTS.CANVAS_ID,
-			CONSTANTS.DOM_ELEMENTS.CANVAS_CONTAINER_ID,
-		)
+		const graph = new Graph()
 
 		await graph.init()
 
@@ -85,8 +82,8 @@ document.addEventListener(
 						return
 					}
 
-					if (value !== CONSTANTS.RENDERERS.NAMES.FFT3D) {
-						// fft3d-pointgrdi and fft-2d not support webworker
+					if (value === CONSTANTS.RENDERERS.NAMES.FFT2D) {
+						// fft-2d not support webworker
 						// so hide this option
 						if (useWebWorkerCheckboxContainer) {
 							useWebWorkerCheckboxContainer.classList.add('d-none')
@@ -164,7 +161,7 @@ document.addEventListener(
 			UIUtils.adjustControllerLayout()
 		})
 
-		const audioBtn = document.getElementById('file-audio-input')
+		const audioBtn = document.getElementById(CONSTANTS.DOM_ELEMENTS.FILE_INPUT_ID)
 
 		if (!audioBtn) {
 			throw new Error('Audio File Input not found')

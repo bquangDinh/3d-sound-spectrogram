@@ -32,6 +32,8 @@ export const CONSTANTS = {
 		WEBWORKER_CHECKBOX_CONTAINER_ID: 'webworker-cb-container',
 		TRACKBAR_BALL_ID: 'trackball',
 		TRACKBAR_ID: 'soundtrack-bar',
+		FILE_INPUT_ID: 'file-audio-input',
+		CANVAS_OVERLAY_ID: 'canvas-overlay',
 	},
 	RENDERERS: {
 		NAMES: {

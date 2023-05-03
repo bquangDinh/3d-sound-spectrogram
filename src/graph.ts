@@ -51,6 +51,8 @@ export class Graph {
 
 	private canvasContainer!: HTMLDivElement
 
+	private canvasOverlay!: HTMLDivElement
+
 	private trackbar: HTMLElement | null = null
 
 	private trackball: HTMLElement | null = null
@@ -97,10 +99,15 @@ export class Graph {
 
 	private audioStartedAt = 0
 
-	constructor(canvasId: string, canvasContainerId: string) {
-		this.canvas = document.getElementById(canvasId) as HTMLCanvasElement
+	constructor() {
+		this.canvas = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CANVAS_ID,
+		) as HTMLCanvasElement
 		this.canvasContainer = document.getElementById(
-			canvasContainerId,
+			CONSTANTS.DOM_ELEMENTS.CANVAS_CONTAINER_ID,
+		) as HTMLDivElement
+		this.canvasOverlay = document.getElementById(
+			CONSTANTS.DOM_ELEMENTS.CANVAS_OVERLAY_ID,
 		) as HTMLDivElement
 
 		this.trackbar = document.getElementById(CONSTANTS.DOM_ELEMENTS.TRACKBAR_ID)
@@ -108,9 +115,14 @@ export class Graph {
 			CONSTANTS.DOM_ELEMENTS.TRACKBAR_BALL_ID,
 		)
 
-		if (!this.canvas || !this.canvasContainer) {
-			throw new Error('Canvas Or Container is null')
+		if (!this.canvas || !this.canvasContainer || !this.canvasOverlay) {
+			throw new Error('Canvas Or Container Or Overlay is null')
 		}
+
+		this.canvasOverlay.addEventListener(
+			'click',
+			this.resumeAudioContext.bind(this),
+		)
 
 		this.canvas.width = this.canvasContainer.clientWidth
 		this.canvas.height = this.canvasContainer.clientHeight
@@ -197,6 +209,8 @@ export class Graph {
 			// no source connected
 			return
 		}
+
+		this.updateAudioContextState()
 
 		// Update source data
 		this.updateSource()
@@ -645,6 +659,24 @@ export class Graph {
 		}
 	}
 
+	private updateAudioContextState() {
+		if (this.audioContext) {
+			if (this.audioContext.state === 'closed') {
+				// OS or Web Browser or something terminate the audio context
+				UIUtils.setSubHeaderText(
+					'Audio Source is not available for some reasons. Maybe a reload can help fix the problem',
+					'error',
+				)
+			} else if (this.audioContext.state === 'suspended') {
+				// Suspended by web browser
+				// require user action to resume
+				this.canvasOverlay.classList.remove('d-none')
+			} else {
+				this.canvasOverlay.classList.add('d-none')
+			}
+		}
+	}
+
 	private updateSource() {
 		if (this.analyser) {
 			// In case I forget
@@ -669,6 +701,12 @@ export class Graph {
 
 		for (let i = 0; i < this.dataArray.length; ++i) {
 			view.setUint8(i, 0)
+		}
+	}
+
+	private resumeAudioContext() {
+		if (this.audioContext) {
+			this.audioContext.resume()
 		}
 	}
 }

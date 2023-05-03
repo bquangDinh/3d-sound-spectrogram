@@ -35,6 +35,10 @@
 
 		<div id="canvas-container">
 			<canvas id="spectrogram-canvas"></canvas>
+			<div id="canvas-overlay" class="center-container center-container--column d-none">
+				<i class="fa-solid fa-arrow-pointer fa-fade fa-xl"></i>
+				<p>Click to resume</p>
+			</div>
 		</div>
 
 		<div id="bars-container">
@@ -79,22 +83,40 @@
 
 				<div class="content">
 					<div class="option-btns" style="margin-top: 5px;">
-						<button class="option-btn" data-ops-category="source" data-ops-value="soundtrack" data-select="0">
+						<button class="option-btn tooltip-container" data-ops-category="source" data-ops-value="soundtrack" data-select="0">
 							<i class="fa-solid fa-music"></i>
 							<span class="tooltip-text">
-								Source from a soundtrack
+								<p>
+									<b>Source from a soundtrack</b>
+								</p>
+
+								<p>
+									Use one of my selected soundtracks. Check it out!
+								</p>
 							</span>
 						</button>
-						<button class="option-btn" data-ops-category="source" data-ops-value="mic" data-select="1">
+						<button class="option-btn tooltip-container" data-ops-category="source" data-ops-value="mic" data-select="1">
 							<i class="fa-solid fa-microphone"></i>
 							<span class="tooltip-text">
-								Source from microphone
+								<p>
+									<b>Source from microphone</b>
+								</p>
+
+								<p>
+									Use your microphone recording
+								</p>
 							</span>
 						</button>
-						<button class="option-btn" data-ops-category="source" data-ops-value="file" data-select="0">
+						<button class="option-btn tooltip-container" data-ops-category="source" data-ops-value="file" data-select="0">
 							<i class="fa-solid fa-file-audio"></i>
 							<span class="tooltip-text">
-								Source from file
+								<p>
+									<b>Source from an audio file</b>
+								</p>
+
+								<p>
+									Choose your favoriate soundtrack!
+								</p>
 							</span>
 							<label>
 								<input type="file" id="file-audio-input">
@@ -112,7 +134,7 @@
 
 				<div class="content">
 					<div class="option-btns" style="margin-top: 5px;">
-						<button class="option-btn" data-ops-category="cameraMovement"  data-ops-value="free" data-select="0">
+						<button class="option-btn tooltip-container" data-ops-category="cameraMovement"  data-ops-value="free" data-select="0">
 							<i class="fa-solid fa-person-running"></i>
 							<span class="tooltip-text">
 								<p>
@@ -123,7 +145,7 @@
 								</p>
 							</span>
 						</button>
-						<button class="option-btn" data-ops-category="cameraMovement"  data-ops-value="lock" data-select="1">
+						<button class="option-btn tooltip-container" data-ops-category="cameraMovement"  data-ops-value="lock" data-select="1">
 							<i class="fa-solid fa-eye"></i>
 							<span class="tooltip-text">
 								<p>
@@ -146,13 +168,19 @@
 
 				<div class="content">
 					<div class="option-btns" style="margin-top: 5px;">
-						<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-2d" data-select="0">
+						<button class="option-btn tooltip-container" data-ops-category="graph"  data-ops-value="fft-2d" data-select="0">
 							<i class="fa-solid fa-signal"></i>
 							<span class="tooltip-text">
-								2D Graph
+								<p>
+									<b>2D Graph</b>
+								</p>
+
+								<p>
+									Generate a 2D graph. X is frequencies and Y is each frequency's magnitude
+								</p>
 							</span>
 						</button>
-						<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="0">
+						<button class="option-btn tooltip-container" data-ops-category="graph"  data-ops-value="fft-3d-point-grid" data-select="0">
 							<i class="fa-solid fa-grip"></i>
 							<span class="tooltip-text">
 								<p>
@@ -163,7 +191,7 @@
 								</p>
 							</span>
 						</button>
-						<button class="option-btn" data-ops-category="graph"  data-ops-value="fft-3d" data-select="1">
+						<button class="option-btn tooltip-container" data-ops-category="graph"  data-ops-value="fft-3d" data-select="1">
 							<i class="fa-solid fa-cubes"></i>
 							<span class="tooltip-text">
 								<p>
@@ -207,12 +235,15 @@
 						</span>
 					</div>
 					<div>
-						<div class="app-checkbox" id="webworker-cb-container">
+						<div class="app-checkbox tooltip-container" id="webworker-cb-container">
 							<label>
 								Web Worker
 								<input type="checkbox" id="use-web-worker-cb" checked>
 								<span class="placement"></span>
 							</label>
+							<div class="tooltip-text">
+								Offload extensive calculations to another thread. May help to increase FPS and easier to move around. The scene will feel a bit "behind" though
+							</div>
 						</div>
 					</div>
 				</div>

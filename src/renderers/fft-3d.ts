@@ -3,7 +3,7 @@ import { EdgeVertexIndices, TriangleTable } from '../constants/lookup-table'
 import { CONSTANTS } from '../constants/constants'
 
 /* Utils */
-import { max, min } from 'lodash'
+import { max } from 'lodash'
 import { NumberUtils } from '../utils/utils'
 import { glMatrix, mat4, vec3, vec4 } from 'gl-matrix'
 
@@ -71,14 +71,6 @@ export class FFT3D extends Renderer {
 
 	/* Workers */
 	worker: Worker | null = null
-
-	public maxX = Number.NEGATIVE_INFINITY
-
-	public minX = Number.POSITIVE_INFINITY
-
-	public maxZ = Number.NEGATIVE_INFINITY
-
-	public minZ = Number.POSITIVE_INFINITY
 
 	public init(): void {
 		if (this.isInitialized) {
@@ -294,8 +286,6 @@ export class FFT3D extends Renderer {
 
 	public update(dt: number): void {
 		if (this.isInitialized) {
-			this.updateFFT()
-
 			// Using worker
 			if (this.worker) {
 				// transfer new data to workers
@@ -305,6 +295,8 @@ export class FFT3D extends Renderer {
 					this.initSendingBuffer = true
 				}
 			} else {
+				this.updateFFT()
+
 				// Not using worker
 				// update data as normal
 				this.updateData()
@@ -395,20 +387,8 @@ export class FFT3D extends Renderer {
 			throw new Error('No shader program!')
 		}
 
-		this.shaderProgram.use()
-
-		console.log(!!this.worker)
-
 		if (!this.worker) {
 			this.vertices = []
-
-			this.minX = Number.POSITIVE_INFINITY
-
-			this.maxX = Number.NEGATIVE_INFINITY
-
-			this.minZ = Number.POSITIVE_INFINITY
-
-			this.maxZ = Number.NEGATIVE_INFINITY
 
 			// Triangulate based on vertices FFT data
 			this.triangulate()
@@ -422,6 +402,8 @@ export class FFT3D extends Renderer {
 				this.vertices = this.v2
 			}
 		}
+
+		this.shaderProgram.use()
 
 		// Use VAO
 		gl.bindVertexArray(this.VAO)
@@ -608,14 +590,6 @@ export class FFT3D extends Renderer {
 
 		const normal = vec3.cross(vec3.create(), p12, p13)
 
-		this.minX = min([this.minX, p1[0], p2[0], p3[0]]) ?? Number.POSITIVE_INFINITY
-
-		this.maxX = max([this.maxX, p1[0], p2[0], p3[0]]) ?? Number.NEGATIVE_INFINITY
-
-		this.minZ = min([this.minZ, p1[2], p2[2], p3[2]]) ?? Number.POSITIVE_INFINITY
-
-		this.maxZ = max([this.maxZ, p1[2], p2[2], p3[2]]) ?? Number.NEGATIVE_INFINITY
-
 		this.vertices.push(
 			p1[0],
 			p1[1],
@@ -640,12 +614,6 @@ export class FFT3D extends Renderer {
 
 	private updateFFT() {
 		if (!this.dataSource) {
-			return
-		}
-
-		// Using worker
-		// no need to update ffts array since data is already been sent to the worker
-		if (this.worker) {
 			return
 		}
 
