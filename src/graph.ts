@@ -10,6 +10,7 @@ import { Renderer } from './renderers/renderer'
 import ValseOp69No1 from './assets/audios/valse_op69_no_1.mp3'
 import IllAlwaysRemember from './assets/audios/illalwaysremember.mp3'
 import Menuet from './assets/audios/menuet.mp3'
+import AntonioVivaldi from './assets/audios/Antonio-Vivaldi-Concerto-No4-in.mp3'
 
 import { FileUtils, UIUtils } from './utils/utils'
 
@@ -41,6 +42,7 @@ export const SOUNDTRACKS = {
 	ILL_ALWAYS_REMEMBER: '1',
 	VALSE_OP_69_N1: '3',
 	MENUET: '2',
+	ANTONIO_VIVALDI: '4',
 }
 
 export type SourceType = 'mic' | 'soundtrack' | 'file'
@@ -242,9 +244,15 @@ export class Graph {
 			return
 		}
 
-		const currentTime =
+		let currentTime =
 			(this.audioContext.currentTime - this.audioStartedAt) *
 			this.soundtrack.playbackRate.value
+
+		if (currentTime > this.soundtrack.buffer.duration) {
+			// loop
+			this.audioStartedAt = this.audioContext.currentTime
+			currentTime = 0
+		}
 
 		const percentage = currentTime / this.soundtrack.buffer.duration
 
@@ -423,6 +431,11 @@ export class Graph {
 								"Now playing <a href='https://www.youtube.com/watch?v=oSkkddfHaP4' target='_blank' rel='noopener noreferrer'>Menuet - Toshifumi Hinata</a>",
 								'soundtrack-playing',
 							)
+						} else if (this.currentSoundtrack === SOUNDTRACKS.ANTONIO_VIVALDI) {
+							UIUtils.setSubHeaderText(
+								"Now playing <a href='https://www.youtube.com/watch?v=NzCL9uLkQSI' target='_blank' rel='noopener noreferrer'>Antonio Vivaldi - Concerto No.4 in F minor, Op.8, RV 297</a>",
+								'soundtrack-playing',
+							)
 						}
 					}
 				}, 1500)
@@ -530,6 +543,8 @@ export class Graph {
 			url = IllAlwaysRemember
 		} else if (name === SOUNDTRACKS.MENUET) {
 			url = Menuet
+		} else if (name === SOUNDTRACKS.ANTONIO_VIVALDI) {
+			url = AntonioVivaldi
 		}
 
 		return new Promise((resolve, reject) => {

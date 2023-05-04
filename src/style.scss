@@ -71,7 +71,8 @@ h1 {
 #app {
 	margin: 0 auto;
 	height: 100vh;
-	overflow: hidden;
+	overflow-y: auto;
+	overflow-x: hidden;
 }
 
 #header {
